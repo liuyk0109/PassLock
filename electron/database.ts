@@ -38,6 +38,8 @@ export async function initDatabase(): Promise<Low<DatabaseData>> {
   const userDataPath = app.getPath('userData')
   const dbPath = join(userDataPath, 'vault.json')
 
+  console.log('Database path:', dbPath)
+
   // 创建适配器
   const adapter = new JSONFile<DatabaseData>(dbPath)
 
@@ -47,11 +49,26 @@ export async function initDatabase(): Promise<Low<DatabaseData>> {
   // 读取数据
   await db.read()
 
-  // 如果数据为空，使用默认数据初始化
+  // 如果数据为空或不完整，使用默认数据填充缺失字段
   if (!db.data) {
-    db.data = defaultData
+    console.log('Database empty, initializing with default data')
+    db.data = { ...defaultData }
+    await db.write()
+  } else {
+    // 确保所有必要字段存在（兼容旧数据）
+    if (db.data.masterKeyVerify === undefined) {
+      db.data.masterKeyVerify = null
+    }
+    if (!db.data.settings) {
+      db.data.settings = defaultData.settings
+    }
+    if (!db.data.entries) {
+      db.data.entries = []
+    }
     await db.write()
   }
+
+  console.log('Database initialized, masterKeyVerify:', db.data.masterKeyVerify)
 
   return db
 }

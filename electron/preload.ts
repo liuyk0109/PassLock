@@ -1,5 +1,30 @@
-import { contextBridge, ipcRenderer } from 'electron'
-import type { VaultEntry } from '../src/stores/vault'
+// Electron preload script - 使用 CommonJS 兼容写法
+// @ts-ignore
+const { contextBridge, ipcRenderer } = require('electron')
+
+// 类型导入 (仅用于类型检查，不会打包)
+type VaultEntry = {
+  id: string
+  title: string
+  username: string
+  password: string
+  url?: string
+  notes?: string
+  createdAt: number
+  updatedAt: number
+}
+
+interface PasswordOptions {
+  lowercase?: boolean
+  uppercase?: boolean
+  numbers?: boolean
+  symbols?: boolean
+}
+
+interface Settings {
+  autoLockTimeout?: number
+  theme?: 'light' | 'dark' | 'system'
+}
 
 // 暴露给渲染进程的 API
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -36,15 +61,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 })
 
-// 类型定义
-interface PasswordOptions {
-  lowercase?: boolean
-  uppercase?: boolean
-  numbers?: boolean
-  symbols?: boolean
-}
-
-interface Settings {
-  autoLockTimeout?: number
-  theme?: 'light' | 'dark' | 'system'
-}
+console.log('Preload script loaded successfully')

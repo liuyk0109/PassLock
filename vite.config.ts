@@ -6,22 +6,33 @@ import electron from 'vite-plugin-electron'
 export default defineConfig({
   plugins: [
     vue(),
-    electron({
-      entry: 'electron/main.ts',
-      onstart(options) {
-        options.startup()
+    electron([
+      {
+        entry: 'electron/main.ts',
+        onstart(options) {
+          options.startup()
+        },
+        vite: {
+          build: {
+            outDir: 'dist-electron',
+          },
+        },
       },
-      vite: {
-        build: {
-          outDir: 'dist-electron',
-          rollupOptions: {
-            input: {
-              main: 'electron/main.ts',
-              preload: 'electron/preload.ts',
+      {
+        entry: 'electron/preload.ts',
+        onstart(options) {
+          options.reload()
+        },
+        vite: {
+          build: {
+            outDir: 'dist-electron',
+            lib: {
+              entry: 'electron/preload.ts',
+              formats: ['cjs'],
             },
           },
         },
       },
-    }),
+    ]),
   ],
 })
