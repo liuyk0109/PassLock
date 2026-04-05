@@ -1,13 +1,16 @@
 {
   "name": "passlock",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.1-alpha.01",
   "main": "dist-electron/main.js",
   "type": "module",
   "author": "Your Name",
   "description": "A lightweight password manager desktop application",
   "scripts": {
     "dev": "vite",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "pack": "pnpm build && electron-builder --dir",
@@ -27,10 +30,11 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
-      ],
-      "icon": "public/icons.svg"
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -40,12 +44,14 @@
       "createStartMenuShortcut": true
     },
     "mac": {
-      "target": ["dmg"],
-      "icon": "public/icons.svg"
+      "target": [
+        "dmg"
+      ]
     },
     "linux": {
-      "target": ["AppImage"],
-      "icon": "public/icons.svg"
+      "target": [
+        "AppImage"
+      ]
     }
   },
   "dependencies": {
@@ -56,12 +62,14 @@
   "devDependencies": {
     "@types/node": "^24.12.0",
     "@vitejs/plugin-vue": "^6.0.5",
+    "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.9.0",
     "electron": "^41.1.1",
     "electron-builder": "^26.8.1",
     "typescript": "~5.9.3",
     "vite": "^8.0.1",
     "vite-plugin-electron": "^0.29.1",
+    "vitest": "^4.1.2",
     "vue-tsc": "^3.2.5"
   }
 }

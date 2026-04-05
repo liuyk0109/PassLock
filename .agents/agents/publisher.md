@@ -80,6 +80,7 @@ pnpm build  # 构建生产版本
 - `dist/` - Web构建产物
 - `dist-electron/` - Electron构建产物
 - `release/` - 安装包产物
+- `.agents/docs/release-notes/RELEASE-{version}.md`
 
 **输出内容**：
 - 构建产物清单

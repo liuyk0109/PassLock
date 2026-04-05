@@ -45,3 +45,9 @@ Thumbs.db
 # Lock files (保留 pnpm-lock.yaml)
 package-lock.json
 yarn.lock
+
+# agent test
+.agents/docs/test-reports
+
+# agent release
+.agents/docs/release-notes
