@@ -8,6 +8,20 @@ export default defineConfig({
     vue(),
     electron({
       entry: 'electron/main.ts',
+      onstart(options) {
+        options.startup()
+      },
+      vite: {
+        build: {
+          outDir: 'dist-electron',
+          rollupOptions: {
+            input: {
+              main: 'electron/main.ts',
+              preload: 'electron/preload.ts',
+            },
+          },
+        },
+      },
     }),
   ],
 })
