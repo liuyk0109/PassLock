@@ -19,6 +19,15 @@ dist-electron
 # Electron
 release/
 
+# IDE个性化配置（不纳入版本控制）
+.qoder/
+
+# Agent任务日志（临时文件）
+.agents/tasks/*.log
+!.agents/tasks/.gitkeep
+.agents/docs/*.tmp
+!.agents/docs/.gitkeep
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

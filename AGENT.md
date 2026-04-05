@@ -1,70 +1,66 @@
-# PassLock 项目配置
+# PassLock Agent 入口
+
+> 渐进式披露入口 - 按需导航至详细信息
+
+---
+
+## 快速开始
+
+1. **开始新任务** → 阅读 [.agents/WORKFLOW.md](.agents/WORKFLOW.md)
+2. **了解Subagent** → 查看 [.agents/agents/](.agents/agents/) 目录
+3. **项目技术栈** → 继续阅读本文下方
+
+---
+
+## Agent 体系导航
+
+| Agent | 职责 | 文件路径 |
+|-------|------|----------|
+| UI/UX | 用户界面设计 | [.agents/agents/ui-ux.md](.agents/agents/ui-ux.md) |
+| Architect | 系统架构设计 | [.agents/agents/architect.md](.agents/agents/architect.md) |
+| Developer | 代码实现 | [.agents/agents/developer.md](.agents/agents/developer.md) |
+| Reviewer | 代码审查 | [.agents/agents/reviewer.md](.agents/agents/reviewer.md) |
+| QA | 质量验证 | [.agents/agents/qa.md](.agents/agents/qa.md) |
+| Cryptographer | 加密方案 | [.agents/agents/cryptographer.md](.agents/agents/cryptographer.md) |
+| Publisher | 打包发布 | [.agents/agents/publisher.md](.agents/agents/publisher.md) |
+
+---
+
+## 任务流转
+
+```
+需求 → UI/UX → Architect → Developer ← Cryptographer
+                              ↓
+                           Reviewer → QA → Publisher
+```
+
+---
 
 ## 技术栈
 
-- **Electron**: 41.1.1 - 桌面应用框架
-- **Vite**: 8.0.3 - 构建工具
-- **Vue**: 3.5.32 - 前端框架
-- **TypeScript**: 5.9.3 - 类型支持
-- **vite-plugin-electron**: 0.29.1 - Vite Electron 插件
+| 类别 | 技术 | 版本 |
+|------|------|------|
+| 框架 | Electron | 41.1.1 |
+| 前端 | Vue 3 | 3.5.32 |
+| 构建 | Vite | 8.0.3 |
+| 类型 | TypeScript | 5.9.3 |
+| 包管理 | pnpm | 优先使用 |
 
-## 包管理器
+---
 
-优先使用 **pnpm** 进行包管理。
-
-## 国内镜像源配置
-
-### pnpm 镜像源
-```bash
-# 设置 npm 镜像源
-pnpm config set registry https://registry.npmmirror.com
-
-# Electron 镜像源（安装 Electron 时需要）
-$env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
-pnpm install
-```
-
-### 常用国内镜像源
-- npm: `https://registry.npmmirror.com`
-- Electron: `https://npmmirror.com/mirrors/electron/`
-- Node.js: `https://npmmirror.com/mirrors/node/`
-
-## 构建命令
+## 常用命令
 
 ```bash
-# 安装依赖
-pnpm install
-
-# 开发模式（启动 Electron 应用）
-pnpm dev
-
-# 构建生产版本
-pnpm build
-
-# 预览生产构建
-pnpm preview
+pnpm install    # 安装依赖
+pnpm dev        # 开发模式
+pnpm build      # 生产构建
 ```
 
-## 项目结构
+---
 
-```
-d:\code\PassLock
-├── electron/
-│   └── main.ts          # Electron 主进程
-├── src/
-│   ├── App.vue          # 根组件
-│   ├── main.ts          # 入口文件
-│   └── vite-env.d.ts    # Vite 类型声明
-├── dist-electron/       # Electron 编译输出（开发时自动生成）
-├── dist/                # Web 构建输出
-├── vite.config.ts       # Vite 配置
-├── tsconfig.json        # TypeScript 配置
-└── package.json         # 项目配置
-```
+## 详细文档位置
 
-## 开发注意事项
-
-1. Electron 主进程代码放在 `electron/` 目录
-2. 渲染进程代码放在 `src/` 目录
-3. 开发时 Vite 会自动编译 Electron 主进程并热重载
-4. 生产构建需要先编译 TypeScript，再打包应用
+- **工作流规范**: [.agents/WORKFLOW.md](.agents/WORKFLOW.md)
+- **文档沉淀**: [.agents/docs/](.agents/docs/)
+- **任务记录**: [.agents/tasks/](.agents/tasks/)
+- **IDE配置**: [.qoder/](.qoder/) (Git排除)
