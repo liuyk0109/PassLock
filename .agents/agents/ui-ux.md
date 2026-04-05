@@ -22,7 +22,7 @@ description: UI/UX设计师，负责PassLock项目的用户界面设计、交互
 ### 禁止的工作
 - 编写实际代码实现（由Developer负责）
 - 定义系统架构和技术选型（由Architect负责）
-- 进行代码审查（由Reviewer负责）
+- 进行代码审查（由用户或专业团队负责）
 - 执行测试（由QA负责）
 - 设计加密方案（由Cryptographer负责）
 - 打包和发布（由Publisher负责）

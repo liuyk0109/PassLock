@@ -19,7 +19,7 @@
 | UI/UX | 用户界面设计 | [.agents/agents/ui-ux.md](.agents/agents/ui-ux.md) |
 | Architect | 系统架构设计 | [.agents/agents/architect.md](.agents/agents/architect.md) |
 | Developer | 代码实现 | [.agents/agents/developer.md](.agents/agents/developer.md) |
-| Reviewer | 代码审查 | [.agents/agents/reviewer.md](.agents/agents/reviewer.md) |
+| 代码审查 | 用户/专业团队负责 | 审查报告存放 `.agents/docs/review-reports/` |
 | QA | 质量验证 | [.agents/agents/qa.md](.agents/agents/qa.md) |
 | Cryptographer | 加密方案 | [.agents/agents/cryptographer.md](.agents/agents/cryptographer.md) |
 | Publisher | 打包发布 | [.agents/agents/publisher.md](.agents/agents/publisher.md) |
@@ -31,7 +31,9 @@
 ```
 需求 → UI/UX → Architect → Developer ← Cryptographer
                               ↓
-                           Reviewer → QA → Publisher
+                        代码审查(用户/专业团队)
+                              ↓
+                           QA → Publisher
 ```
 
 ---
@@ -60,6 +62,16 @@
 pnpm install    # 安装依赖
 pnpm dev        # 开发模式
 pnpm build      # 生产构建
+```
+
+---
+
+## 网络代理
+
+如遇网络访问、下载资源失败或速度慢，可设置代理：
+
+```powershell
+$env:HTTP_PROXY="http://127.0.0.1:7897"
 ```
 
 ---
