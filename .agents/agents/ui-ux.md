@@ -101,7 +101,7 @@ description: UI/UX设计师，负责PassLock项目的用户界面设计、交互
 
 ### 5. 记录（Record）
 
-**记录位置**：`.agents/tasks/{date}_ui-ux-{task-id}.log`
+**记录位置**：`.agents/docs/logs/{date}_ui-ux-{task-id}.log`
 
 **记录内容**：
 - 任务描述

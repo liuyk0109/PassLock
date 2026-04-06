@@ -90,7 +90,7 @@ pnpm build  # 构建生产版本
 
 ### 5. 记录（Record）
 
-**记录位置**：`.agents/tasks/{date}_publisher-{task-id}.log`
+**记录位置**：`.agents/docs/logs/{date}_publisher-{task-id}.log`
 
 **记录内容**：
 - 发布任务描述

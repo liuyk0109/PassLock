@@ -108,7 +108,7 @@ pnpm dev  # 启动开发模式进行测试
 
 ### 5. 记录（Record）
 
-**记录位置**：`.agents/tasks/{date}_qa-{task-id}.log`
+**记录位置**：`.agents/docs/logs/{date}_qa-{task-id}.log`
 
 **记录内容**：
 - 测试任务描述
