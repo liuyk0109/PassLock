@@ -34,6 +34,16 @@ const notesDisplay = computed(() => {
 function handleCopy() {
   emit('copy-password', props.entry.id)
 }
+
+// 处理编辑按钮点击
+function handleEdit() {
+  emit('edit-entry', props.entry.id)
+}
+
+// 处理删除按钮点击
+function handleDelete() {
+  emit('delete-entry', props.entry.id)
+}
 </script>
 
 <template>
@@ -70,10 +80,21 @@ function handleCopy() {
     <div class="card-divider"></div>
 
     <!-- 底部：操作按钮区 -->
-    <div class="card-footer">
+    <div class="card-footer" :class="{ 'show-actions': isHovered || props.isCopied }">
+      <!-- 编辑按钮 -->
+      <button 
+        class="action-btn edit-btn"
+        @click="handleEdit"
+        title="编辑"
+      >
+        <svg class="btn-icon" viewBox="0 0 24 24">
+          <path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25ZM20.71 7.04C21.1 6.65 21.1 6.02 20.71 5.63L18.37 3.29C17.98 2.9 17.35 2.9 16.96 3.29L15.13 5.12L18.88 8.87L20.71 7.04Z" fill="currentColor"/>
+        </svg>
+      </button>
+
       <!-- 复制按钮 -->
       <button 
-        class="copy-btn"
+        class="action-btn copy-btn"
         :class="{ 'copied': props.isCopied }"
         @click="handleCopy"
         title="复制密码"
@@ -85,6 +106,17 @@ function handleCopy() {
           <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z" fill="currentColor"/>
         </svg>
         <span v-if="props.isCopied" class="copied-text">已复制</span>
+      </button>
+
+      <!-- 删除按钮 -->
+      <button 
+        class="action-btn delete-btn"
+        @click="handleDelete"
+        title="删除"
+      >
+        <svg class="btn-icon" viewBox="0 0 24 24">
+          <path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19ZM19 4H15.5L14.5 3H9.5L8.5 4H5V6H19V4Z" fill="currentColor"/>
+        </svg>
       </button>
     </div>
   </div>
@@ -199,10 +231,22 @@ function handleCopy() {
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  gap: var(--space-sm);
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
 }
 
-/* 复制按钮 */
-.copy-btn {
+.card-footer.show-actions {
+  opacity: 1;
+}
+
+.password-card:hover .card-footer {
+  opacity: 1;
+  transition: opacity 0.2s ease-out;
+}
+
+/* 操作按钮基础样式 */
+.action-btn {
   width: 32px;
   height: 32px;
   display: flex;
@@ -217,21 +261,28 @@ function handleCopy() {
   transition: background 0.2s, color 0.2s;
 }
 
-.copy-btn:hover {
+.action-btn:hover {
   background: rgba(20, 184, 166, 0.15);
   color: var(--primary-400);
 }
 
+.action-btn .btn-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* 编辑按钮 */
+.edit-btn:hover {
+  background: rgba(20, 184, 166, 0.15);
+  color: var(--primary-400);
+}
+
+/* 复制按钮 */
 .copy-btn.copied {
   background: rgba(20, 184, 166, 0.2);
   color: var(--primary-400);
   width: auto;
   padding: 0 var(--space-md);
-}
-
-.copy-btn .btn-icon {
-  width: 16px;
-  height: 16px;
 }
 
 .copy-btn .check-icon {
@@ -241,6 +292,12 @@ function handleCopy() {
 .copy-btn .copied-text {
   font-size: 12px;
   font-weight: 500;
+}
+
+/* 删除按钮（危险风格） */
+.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error);
 }
 
 /* 响应式适配 */

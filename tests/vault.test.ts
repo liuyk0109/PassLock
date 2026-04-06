@@ -2,7 +2,7 @@
  * vault.ts Pinia Store 测试用例
  * 测试范围：密码库状态管理、条目CRUD操作、锁定/解锁逻辑
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useVaultStore, type VaultEntry } from '../src/stores/vault'
 
@@ -27,8 +27,9 @@ const mockClipboard = {
 
 // 设置全局 mock
 beforeEach(() => {
-  vi.stubGlobal('window', { electronAPI: mockElectronAPI })
-  vi.stubGlobal('navigator', { clipboard: mockClipboard })
+  // 直接修改window属性，保留原有构造函数
+  ;(window as any).electronAPI = mockElectronAPI
+  ;(navigator as any).clipboard = mockClipboard
   setActivePinia(createPinia())
   vi.clearAllMocks()
 })
@@ -473,5 +474,251 @@ describe('综合场景', () => {
     
     // 状态为锁定
     expect(store.isLocked).toBe(true)
+  })
+})
+
+// ==================== TC-STORE-010: editEntry 操作 ====================
+describe('editEntry 操作', () => {
+  it('TC-STORE-010-01: 应成功编辑条目并更新标题', async () => {
+    const store = useVaultStore()
+    store.unlock('masterPassword')
+    
+    // 先创建一个条目
+    const entry = store.addEntry({ 
+      title: 'Original Title', 
+      username: 'user', 
+      password: 'encrypted-password' 
+    })
+    
+    // 编辑条目
+    const result = await store.editEntry(entry.id, {
+      title: 'Updated Title',
+      username: 'user',
+      site: '',
+      notes: ''
+    })
+    
+    expect(result.title).toBe('Updated Title')
+    expect(store.getEntry(entry.id)?.title).toBe('Updated Title')
+  })
+
+  it('TC-STORE-010-02: 编辑时密码修改应重新加密', async () => {
+    const store = useVaultStore()
+    store.unlock('masterPassword')
+    
+    const entry = store.addEntry({ 
+      title: 'Test', 
+      username: 'user', 
+      password: 'old-encrypted' 
+    })
+    
+    await store.editEntry(entry.id, {
+      title: 'Test',
+      username: 'user',
+      password: 'new-password',
+      site: '',
+      notes: ''
+    })
+    
+    // 应调用加密API
+    expect(mockElectronAPI.crypto.encrypt).toHaveBeenCalledWith(
+      'new-password',
+      'masterPassword'
+    )
+    // 应更新数据库
+    expect(mockElectronAPI.db.updateEntry).toHaveBeenCalled()
+  })
+
+  it('TC-STORE-010-03: 编辑时密码未修改不应重新加密', async () => {
+    vi.clearAllMocks()
+    const store = useVaultStore()
+    store.unlock('masterPassword')
+    
+    const entry = store.addEntry({ 
+      title: 'Test', 
+      username: 'user', 
+      password: 'encrypted' 
+    })
+    
+    await store.editEntry(entry.id, {
+      title: 'Updated Title',
+      username: 'user',
+      password: undefined,  // 未修改
+      site: '',
+      notes: ''
+    })
+    
+    // 不应调用加密API
+    expect(mockElectronAPI.crypto.encrypt).not.toHaveBeenCalled()
+    // 应仍调用更新
+    expect(mockElectronAPI.db.updateEntry).toHaveBeenCalled()
+  })
+
+  it('TC-STORE-010-04: 锁定状态编辑应抛出错误', async () => {
+    const store = useVaultStore()
+    // 默认锁定状态
+    store.setEntries([{
+      id: 'test-id',
+      title: 'Test',
+      username: 'user',
+      password: 'p',
+      createdAt: 0,
+      updatedAt: 0
+    }])
+    
+    await expect(store.editEntry('test-id', {
+      title: 'Updated',
+      username: 'user'
+    })).rejects.toThrow('Vault is locked')
+  })
+
+  it('TC-STORE-010-05: 编辑不存在的条目应抛出错误', async () => {
+    const store = useVaultStore()
+    store.unlock('masterPassword')
+    
+    await expect(store.editEntry('non-existent-id', {
+      title: 'Test',
+      username: 'user'
+    })).rejects.toThrow('Entry not found')
+  })
+
+  it('TC-STORE-010-06: 编辑应更新updatedAt时间戳', async () => {
+    const store = useVaultStore()
+    store.unlock('masterPassword')
+    
+    const entry = store.addEntry({ 
+      title: 'Test', 
+      username: 'user', 
+      password: 'pass' 
+    })
+    const originalUpdatedAt = entry.updatedAt
+    
+    // 等待确保时间戳不同
+    await new Promise(resolve => setTimeout(resolve, 10))
+    
+    await store.editEntry(entry.id, {
+      title: 'Updated',
+      username: 'user',
+      site: '',
+      notes: ''
+    })
+    
+    expect(store.getEntry(entry.id)?.updatedAt).toBeGreaterThan(originalUpdatedAt)
+  })
+})
+
+// ==================== TC-STORE-011: getDecryptedPassword 操作 ====================
+describe('getDecryptedPassword 操作', () => {
+  it('TC-STORE-011-01: 应成功解密密码', async () => {
+    const store = useVaultStore()
+    store.unlock('masterPassword')
+    
+    store.setEntries([{
+      id: 'test-id',
+      title: 'Test',
+      username: 'user',
+      password: 'encrypted-password',
+      createdAt: 0,
+      updatedAt: 0
+    }])
+    
+    const decrypted = await store.getDecryptedPassword('test-id')
+    
+    expect(mockElectronAPI.crypto.decrypt).toHaveBeenCalledWith(
+      'encrypted-password',
+      'masterPassword'
+    )
+    expect(decrypted).toBe('decrypted-password')
+  })
+
+  it('TC-STORE-011-02: 锁定状态获取密码应抛出错误', async () => {
+    const store = useVaultStore()
+    // 默认锁定状态
+    store.setEntries([{
+      id: 'test-id',
+      title: 'Test',
+      username: 'user',
+      password: 'encrypted',
+      createdAt: 0,
+      updatedAt: 0
+    }])
+    
+    await expect(store.getDecryptedPassword('test-id')).rejects.toThrow('Vault is locked')
+  })
+
+  it('TC-STORE-011-03: 条目不存在应抛出错误', async () => {
+    const store = useVaultStore()
+    store.unlock('masterPassword')
+    
+    await expect(store.getDecryptedPassword('non-existent-id')).rejects.toThrow('Entry not found')
+  })
+})
+
+// ==================== TC-STORE-012: 剪贴板安全清除 ====================
+describe('剪贴板安全清除', () => {
+  it('TC-STORE-012-01: 复制密码后应设置30秒清除定时器', async () => {
+    vi.useFakeTimers()
+    
+    const store = useVaultStore()
+    store.unlock('masterPassword')
+    store.setEntries([{
+      id: 'test-id',
+      title: 'Test',
+      username: 'user',
+      password: 'encrypted',
+      createdAt: 0,
+      updatedAt: 0
+    }])
+    
+    await store.copyPassword('test-id')
+    expect(store.copiedEntryId).toBe('test-id')
+    
+    vi.useRealTimers()
+  })
+
+  it('TC-STORE-012-02: 锁定时应清除剪贴板定时器和状态', async () => {
+    vi.useFakeTimers()
+    
+    const store = useVaultStore()
+    store.unlock('masterPassword')
+    store.setEntries([{
+      id: 'test-id',
+      title: 'Test',
+      username: 'user',
+      password: 'encrypted',
+      createdAt: 0,
+      updatedAt: 0
+    }])
+    
+    await store.copyPassword('test-id')
+    expect(store.copiedEntryId).toBe('test-id')
+    
+    // 锁定
+    store.lock()
+    
+    // 剪贴板应被立即清除
+    expect(mockClipboard.writeText).toHaveBeenCalledWith('')
+    expect(store.copiedEntryId).toBe(null)
+    
+    vi.useRealTimers()
+  })
+
+  it('TC-STORE-012-03: 锁定时应清除所有状态', () => {
+    const store = useVaultStore()
+    store.unlock('masterPassword')
+    
+    store.setEntries([{
+      id: '1', title: 'Test', username: 'user', password: 'p', createdAt: 0, updatedAt: 0,
+    }])
+    store.copiedEntryId = '1'
+
+    // 锁定
+    store.lock()
+
+    // 所有状态应被清除
+    expect(store.masterKey).toBe(null)
+    expect(store.isLocked).toBe(true)
+    expect(store.entries.length).toBe(0)
+    expect(store.copiedEntryId).toBe(null)
   })
 })

@@ -29,8 +29,9 @@ const mockClipboard = {
 
 // 设置全局 mock
 beforeEach(() => {
-  vi.stubGlobal('window', { electronAPI: mockElectronAPI })
-  vi.stubGlobal('navigator', { clipboard: mockClipboard })
+  // 直接修改window属性，保留原有构造函数
+  ;(window as any).electronAPI = mockElectronAPI
+  ;(navigator as any).clipboard = mockClipboard
   setActivePinia(createPinia())
   // 重置所有 mock
   vi.clearAllMocks()
@@ -307,7 +308,7 @@ describe('copyPassword 操作', () => {
     await expect(store.copyPassword('non-existent-id')).rejects.toThrow('Entry not found')
   })
 
-  it('TC-ASYNC-003-04: 复制状态应在1.5秒后清除', async () => {
+  it('TC-ASYNC-003-04: 复制状态应在30秒后清除', async () => {
     vi.useFakeTimers()
     
     const store = useVaultStore()
@@ -321,11 +322,14 @@ describe('copyPassword 操作', () => {
       updatedAt: Date.now(),
     }])
 
-    await store.copyPassword('test-id')
+    const promise = store.copyPassword('test-id')
+    await vi.runAllTimersAsync()
+    await promise
+    
     expect(store.copiedEntryId).toBe('test-id')
 
-    // 快进1.5秒
-    vi.advanceTimersByTime(1500)
+    // 快进30秒
+    vi.advanceTimersByTime(30000)
     
     expect(store.copiedEntryId).toBe(null)
     
@@ -402,7 +406,7 @@ describe('deleteEntry 操作', () => {
 describe('filteredEntries 搜索功能', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    vi.stubGlobal('window', { electronAPI: mockElectronAPI })
+    ;(window as any).electronAPI = mockElectronAPI
   })
 
   it('TC-ASYNC-005-01: 空搜索应返回所有条目', () => {

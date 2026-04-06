@@ -1,19 +1,27 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick, onUnmounted } from 'vue'
 import PasswordGenerator from './PasswordGenerator.vue'
-import type { NewEntryInput } from '../stores/vault'
+import type { NewEntryInput, EditEntryInput, VaultEntry } from '../stores/vault'
 
 // Props 定义
 interface Props {
   visible: boolean
+  mode?: 'add' | 'edit'              // 模式区分，默认 'add'
+  entry?: VaultEntry                 // 编辑模式下的条目数据
+  decryptedPassword?: string         // 编辑模式下的解密密码
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  mode: 'add',
+  entry: undefined,
+  decryptedPassword: undefined
+})
 
 // Emits 定义
 interface Emits {
   (e: 'close'): void
   (e: 'save', input: NewEntryInput): void
+  (e: 'update', id: string, input: EditEntryInput): void  // 编辑模式保存
 }
 
 const emit = defineEmits<Emits>()
@@ -28,6 +36,10 @@ const showGenerator = ref(false)
 const submitting = ref(false)
 const error = ref('')
 const titleInputRef = ref<HTMLInputElement | null>(null)
+
+// 密码自动隐藏相关状态（编辑模式安全增强）
+const passwordMaskTimeout = ref<number | null>(null)  // 5秒自动隐藏定时器
+const isPasswordMasked = ref(true)  // 密码是否掩码显示
 
 // 表单验证
 const formValid = computed(() => {
@@ -62,16 +74,64 @@ const passwordStrength = computed(() => {
   return { level: 0, text: '太短', color: 'var(--strength-weak)', percent: 10 }
 })
 
-// 监听弹窗显示状态，自动聚焦
+// 监听弹窗显示状态，自动聚焦和预填充
 watch(() => props.visible, async (newVal) => {
   if (newVal) {
     await nextTick()
     titleInputRef.value?.focus()
+
+    // 编辑模式：预填充数据
+    if (props.mode === 'edit' && props.entry) {
+      title.value = props.entry.title
+      site.value = props.entry.site ?? ''
+      notes.value = props.entry.notes ?? ''
+      // 密码预填充（默认掩码显示）
+      if (props.decryptedPassword) {
+        password.value = props.decryptedPassword
+        isPasswordMasked.value = true
+        showPassword.value = false
+      }
+    }
   } else {
     // 弹窗关闭时重置表单
     resetForm()
   }
 })
+
+// 清除密码自动隐藏定时器
+function clearPasswordTimeout() {
+  if (passwordMaskTimeout.value !== null) {
+    clearTimeout(passwordMaskTimeout.value)
+    passwordMaskTimeout.value = null
+  }
+}
+
+// 密码显示切换（带自动隐藏逻辑）
+function togglePasswordVisibility() {
+  if (props.mode === 'edit' && isPasswordMasked.value) {
+    // 编辑模式：显示密码后5秒自动隐藏
+    clearPasswordTimeout()
+    isPasswordMasked.value = false
+    showPassword.value = true
+    passwordMaskTimeout.value = window.setTimeout(() => {
+      isPasswordMasked.value = true
+      showPassword.value = false
+      passwordMaskTimeout.value = null
+    }, 5000)  // 5秒
+  } else {
+    // 新增模式或已经显示时：简单切换
+    showPassword.value = !showPassword.value
+  }
+}
+
+// 密码输入框失焦时自动隐藏（编辑模式）
+function handlePasswordBlur() {
+  if (props.mode === 'edit' && showPassword.value) {
+    clearPasswordTimeout()
+    isPasswordMasked.value = true
+    showPassword.value = false
+  }
+}
 
 // 重置表单
 function resetForm() {
@@ -83,6 +143,8 @@ function resetForm() {
   showGenerator.value = false
   submitting.value = false
   error.value = ''
+  isPasswordMasked.value = true
+  clearPasswordTimeout()
 }
 
 // 处理密码生成器使用密码
@@ -91,7 +153,7 @@ function handleUsePassword(newPassword: string) {
   showGenerator.value = false
 }
 
-// 处理保存
+// 处理保存（区分新增和编辑模式）
 async function handleSave() {
   error.value = ''
 
@@ -108,13 +170,27 @@ async function handleSave() {
   submitting.value = true
 
   try {
-    const input: NewEntryInput = {
-      title: title.value.trim(),
-      site: site.value.trim(),
-      password: password.value,
-      notes: notes.value.trim()
+    if (props.mode === 'edit' && props.entry) {
+      // 编辑模式：检测密码是否被修改
+      const passwordChanged = password.value !== props.decryptedPassword
+      
+      const input: EditEntryInput = {
+        title: title.value.trim(),
+        site: site.value.trim(),
+        password: passwordChanged ? password.value : undefined,  // 仅修改时传递
+        notes: notes.value.trim()
+      }
+      emit('update', props.entry.id, input)
+    } else {
+      // 新增模式
+      const input: NewEntryInput = {
+        title: title.value.trim(),
+        site: site.value.trim(),
+        password: password.value,
+        notes: notes.value.trim()
+      }
+      emit('save', input)
     }
-    emit('save', input)
   } catch (e) {
     error.value = '保存失败，请重试'
     console.error(e)
@@ -146,6 +222,12 @@ function handleKeydown(e: KeyboardEvent) {
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
 })
+
+// 组件卸载时清理定时器和事件监听
+onUnmounted(() => {
+  clearPasswordTimeout()
+  window.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
@@ -159,7 +241,7 @@ onMounted(() => {
         <div class="modal-container">
           <!-- Header -->
           <div class="modal-header">
-            <h2 class="modal-title">新增密码条目</h2>
+            <h2 class="modal-title">{{ props.mode === 'edit' ? '编辑密码条目' : '新增密码条目' }}</h2>
             <button class="close-btn" @click="handleClose">
               <svg class="close-icon" viewBox="0 0 24 24">
                 <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z" fill="currentColor"/>
@@ -208,6 +290,7 @@ onMounted(() => {
                   placeholder="输入密码"
                   class="form-input password-input"
                   :disabled="submitting"
+                  @blur="handlePasswordBlur"
                 />
                 <div class="password-actions">
                   <button
@@ -221,7 +304,7 @@ onMounted(() => {
                   <button
                     type="button"
                     class="action-btn"
-                    @click="showPassword = !showPassword"
+                    @click="togglePasswordVisibility"
                     :disabled="submitting"
                   >
                     <svg v-if="showPassword" viewBox="0 0 24 24">
@@ -289,7 +372,7 @@ onMounted(() => {
               <svg v-if="submitting" class="btn-spinner" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
               </svg>
-              {{ submitting ? '保存中...' : '保存' }}
+              {{ submitting ? (props.mode === 'edit' ? '更新中...' : '保存中...') : (props.mode === 'edit' ? '更新' : '保存') }}
             </button>
           </div>
         </div>

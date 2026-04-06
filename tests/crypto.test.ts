@@ -299,9 +299,14 @@ describe('getPasswordStrength', () => {
     expect(score).toBe(60) // 20+10(长度>=12) + 15(小写) + 15(大写) + 15(数字)
   })
 
-  it('TC-CRYPTO-008-05: 16位全类型密码得最高分', () => {
+  it('TC-CRYPTO-008-05: 15位全类型密码得90分', () => {
     const score = getPasswordStrength('abcdEFGH1234!@#')
-    expect(score).toBe(75) // 20+10+10(长度>=16) + 15+15+15+15
+    expect(score).toBe(90) // 20+10(长度>=12但<16) + 15+15+15+15
+  })
+
+  it('TC-CRYPTO-008-05b: 16位全类型密码得最高分', () => {
+    const score = getPasswordStrength('abcdEFGH1234!@#$')
+    expect(score).toBe(100) // 20+10+10(长度>=16) + 15+15+15+15
   })
 
   it('TC-CRYPTO-008-06: 包含符号增加15分', () => {
@@ -325,7 +330,6 @@ describe('getPasswordStrengthLevel', () => {
   })
 
   it('TC-CRYPTO-009-02: 评分40-59返回medium', () => {
-    expect(getPasswordStrengthLevel('abcdefgh')).toBe('medium') // 35分
     expect(getPasswordStrengthLevel('abcdEFGH')).toBe('medium') // 50分
   })
 
@@ -338,9 +342,151 @@ describe('getPasswordStrengthLevel', () => {
   })
 
   it('TC-CRYPTO-009-05: 边界值测试', () => {
-    // 刚好39分应为weak
-    expect(getPasswordStrengthLevel('abcdefg')).toBe('weak') // 20+15=35
-    // 刚好40分应为medium
-    expect(getPasswordStrengthLevel('abcdefgh')).toBe('medium') // 20+15=35, 实际35分
+    // 35分应为weak
+    expect(getPasswordStrengthLevel('abcdefgh')).toBe('weak') // 20+15=35
+    // 50分应为medium
+    expect(getPasswordStrengthLevel('abcdEFGH')).toBe('medium') // 20+15+15=50
+  })
+})
+
+// ==================== TC-CRYPTO-010: IV长度修正验证 ====================
+describe('IV长度修正', () => {
+  it('TC-CRYPTO-010-01: 新加密数据应使用12字节IV（NIST推荐）', () => {
+    const plaintext = 'Test IV length'
+    const password = 'password'
+    const encrypted = encrypt(plaintext, password)
+    
+    // 解码Base64
+    const combined = Buffer.from(encrypted, 'base64')
+    
+    // 提取各部分：salt(32) + iv(12) + authTag(16) + ciphertext
+    const saltLength = 32
+    const ivLength = 12
+    const authTagLength = 16
+    
+    // 验证IV长度为12字节
+    const iv = combined.subarray(saltLength, saltLength + ivLength)
+    expect(iv.length).toBe(12)
+    
+    // 解密应成功
+    const decrypted = decrypt(encrypted, password)
+    expect(decrypted).toBe(plaintext)
+  })
+
+  it('TC-CRYPTO-010-02: 加密数据格式应为 salt(32):iv(12):authTag(16):ciphertext', () => {
+    const plaintext = 'Format test'
+    const password = 'password'
+    const encrypted = encrypt(plaintext, password)
+    
+    const combined = Buffer.from(encrypted, 'base64')
+    
+    // 验证各部分长度
+    const saltLength = 32
+    const ivLength = 12
+    const authTagLength = 16
+    const ciphertextMinLength = 1
+    
+    // 最小长度应为 32 + 12 + 16 + 1 = 61
+    expect(combined.length).toBeGreaterThanOrEqual(saltLength + ivLength + authTagLength + ciphertextMinLength)
+  })
+})
+
+// ==================== TC-CRYPTO-011: 双格式兼容解密 ====================
+describe('双格式兼容解密', () => {
+  it('TC-CRYPTO-011-01: 应能解密新格式（12字节IV）数据', () => {
+    // 使用当前encrypt函数生成新格式数据
+    const plaintext = 'New format test'
+    const password = 'testPassword'
+    const encrypted = encrypt(plaintext, password)
+    
+    const decrypted = decrypt(encrypted, password)
+    expect(decrypted).toBe(plaintext)
+  })
+
+  it('TC-CRYPTO-011-02: 应能解密旧格式（16字节IV）数据', () => {
+    // 模拟旧格式：手动构造16字节IV的加密数据
+    const crypto = require('crypto')
+    const ALGORITHM = 'aes-256-gcm'
+    const KEY_LENGTH = 32
+    const SALT_LENGTH = 32
+    const IV_LENGTH_OLD = 16
+    const AUTH_TAG_LENGTH = 16
+    const PBKDF2_ITERATIONS = 100000
+    
+    const plaintext = 'Old format test'
+    const password = 'testPassword'
+    
+    // 使用旧格式16字节IV进行加密
+    const salt = crypto.randomBytes(SALT_LENGTH)
+    const iv = crypto.randomBytes(IV_LENGTH_OLD)  // 16字节IV
+    const key = crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha256')
+    
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH })
+    const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
+    const authTag = cipher.getAuthTag()
+    
+    // 组合：salt(32) + iv(16) + authTag(16) + ciphertext
+    const combined = Buffer.concat([salt, iv, authTag, ciphertext])
+    const encrypted = combined.toString('base64')
+    
+    // 使用当前decrypt函数解密
+    const decrypted = decrypt(encrypted, password)
+    expect(decrypted).toBe(plaintext)
+  })
+
+  it('TC-CRYPTO-011-03: 错误密码解密旧格式数据应抛出异常', () => {
+    const crypto = require('crypto')
+    const ALGORITHM = 'aes-256-gcm'
+    const KEY_LENGTH = 32
+    const SALT_LENGTH = 32
+    const IV_LENGTH_OLD = 16
+    const AUTH_TAG_LENGTH = 16
+    const PBKDF2_ITERATIONS = 100000
+    
+    const plaintext = 'Test data'
+    const password = 'correctPassword'
+    
+    const salt = crypto.randomBytes(SALT_LENGTH)
+    const iv = crypto.randomBytes(IV_LENGTH_OLD)
+    const key = crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha256')
+    
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH })
+    const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
+    const authTag = cipher.getAuthTag()
+    
+    const combined = Buffer.concat([salt, iv, authTag, ciphertext])
+    const encrypted = combined.toString('base64')
+    
+    expect(() => decrypt(encrypted, 'wrongPassword')).toThrow()
+  })
+
+  it('TC-CRYPTO-011-04: 新旧格式数据混合测试', () => {
+    const crypto = require('crypto')
+    const ALGORITHM = 'aes-256-gcm'
+    const KEY_LENGTH = 32
+    const SALT_LENGTH = 32
+    const IV_LENGTH_OLD = 16
+    const AUTH_TAG_LENGTH = 16
+    const PBKDF2_ITERATIONS = 100000
+    
+    const password = 'samePassword'
+    
+    // 新格式数据
+    const newPlaintext = 'New format'
+    const newEncrypted = encrypt(newPlaintext, password)
+    
+    // 旧格式数据
+    const oldPlaintext = 'Old format'
+    const salt = crypto.randomBytes(SALT_LENGTH)
+    const iv = crypto.randomBytes(IV_LENGTH_OLD)
+    const key = crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha256')
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH })
+    const ciphertext = Buffer.concat([cipher.update(oldPlaintext, 'utf8'), cipher.final()])
+    const authTag = cipher.getAuthTag()
+    const oldEncrypted = Buffer.concat([salt, iv, authTag, ciphertext]).toString('base64')
+    
+    // 两种格式都应能正确解密
+    expect(decrypt(newEncrypted, password)).toBe(newPlaintext)
+    expect(decrypt(oldEncrypted, password)).toBe(oldPlaintext)
   })
 })

@@ -49,7 +49,8 @@ const mockElectronAPI = {
 
 // 设置全局 mock
 beforeEach(() => {
-  vi.stubGlobal('window', { electronAPI: mockElectronAPI })
+  // 直接修改window属性，保留原有构造函数
+  ;(window as any).electronAPI = mockElectronAPI
   setActivePinia(createPinia())
   // 重置所有 mock
   vi.clearAllMocks()

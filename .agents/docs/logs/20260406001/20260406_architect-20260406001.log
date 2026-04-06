@@ -1,0 +1,277 @@
+# Architect Agent 工作日志
+
+## 任务信息
+
+- **任务ID**: 20260406001
+- **任务描述**: 密码卡片操作按钮功能架构设计
+- **执行时间**: 2026-04-07
+- **执行Agent**: architect
+
+---
+
+## 输入文件读取
+
+### 已读取文件
+
+| 文件路径 | 用途 | 关键发现 |
+|----------|------|----------|
+| `.agents/tasks/task_20260406001.md` | 任务跟踪 | 需求简述、前置步骤产物路径、决策记录 |
+| `.agents/docs/requirements/20260406_project-manager-20260406001.md` | 需求文档 | 功能验收标准、约束条件 |
+| `.agents/docs/ui-specs/20260406_ui-ux-20260406001.md` | UI规范 | 组件改造要点、新增组件ConfirmDialog |
+| `src/components/PasswordCard.vue` | 现有卡片组件 | 已定义emit事件，需实现编辑/删除按钮 |
+| `src/components/VaultPage.vue` | 密码库页面 | 处理复制事件，需添加编辑/删除处理 |
+| `src/components/AddPasswordModal.vue` | 新增弹窗 | 支持扩展编辑模式，需添加mode/entry props |
+| `src/stores/vault.ts` | 状态管理 | 已有deleteEntry，需添加editEntry方法 |
+| `electron/preload.ts` | IPC桥接 | API完备，无需新增 |
+| `electron/database.ts` | 数据库操作 | updateEntry/deleteEntry已存在 |
+| `electron/crypto.ts` | 加密模块 | encrypt/decrypt已完备 |
+| `src/types/electron.d.ts` | 类型定义 | IPC API类型完备 |
+| `src/style.css` | 全局样式 | CSS变量完备，可复用 |
+
+---
+
+## 架构决策记录 (ADR)
+
+### ADR-001: 编辑弹窗复用 AddPasswordModal
+
+**决策**: 扩展 AddPasswordModal 组件支持编辑模式，通过 `mode` prop 区分
+
+**背景**: UI设计建议复用现有弹窗，避免重复开发
+
+**选项分析**:
+| 选项 | 优点 | 缺点 |
+|------|------|------|
+| 复用 AddPasswordModal | 代码精简、风格统一、维护成本低 | 需扩展props和逻辑 |
+| 新建 EditPasswordModal | 逻辑分离清晰 | 代码重复、维护成本高 |
+
+**决策结果**: 选择复用 AddPasswordModal，通过 `mode` prop 区分
+
+---
+
+### ADR-002: 删除确认使用自定义 ConfirmDialog
+
+**决策**: 新增 ConfirmDialog.vue 组件
+
+**背景**: UI设计要求删除操作需二次确认，且有视觉警示要求
+
+**选项分析**:
+| 选项 | 优点 | 缺点 |
+|------|------|------|
+| 原生 confirm() | 简单快速 | 无法定制样式、不符合设计规范 |
+| 自定义 ConfirmDialog | 可定制样式、可复用 | 需新增组件 |
+
+**决策结果**: 新增 ConfirmDialog.vue 组件，可复用于其他确认场景
+
+---
+
+### ADR-003: IPC API 复用现有设计
+
+**决策**: 不新增 IPC API，复用现有 crypto.encrypt/decrypt 和 db.updateEntry/deleteEntry
+
+**背景**: 评估现有 API 是否满足需求
+
+**分析结果**: 
+- 加密/解密: 现有 API 已完备
+- 数据库操作: updateEntry/deleteEntry 已存在
+- 无需修改 preload.ts 或 main.ts
+
+**决策结果**: IPC API 无需新增
+
+---
+
+### ADR-004: 状态管理在 VaultPage 层级
+
+**决策**: 编辑/删除确认状态由 VaultPage.vue 管理，不放入 VaultStore
+
+**背景**: 确认弹窗状态是 UI 层逻辑，不涉及全局数据
+
+**选项分析**:
+| 选项 | 优点 | 缺点 |
+|------|------|------|
+| VaultStore 管理 | 状态集中 | 职责混乱、UI状态不应放Store |
+| VaultPage 管理 | 职责清晰、符合组件化 | 需本地状态 |
+
+**决策结果**: editingEntry、showDeleteConfirm 等状态由 VaultPage.vue 本地管理
+
+---
+
+### ADR-005: 编辑时密码解密流程
+
+**决策**: VaultStore 提供 getDecryptedPassword 方法，编辑弹窗通过 prop 接收
+
+**背景**: 编辑需要显示明文密码，涉及安全考量
+
+**流程设计**:
+```
+VaultPage.handleEditEntry(entryId)
+  → VaultStore.getDecryptedPassword(entryId)
+    → IPC: crypto:decrypt
+  → editingDecryptedPassword ref
+  → AddPasswordModal decryptedPassword prop
+```
+
+**安全约束**: 
+- 明文密码仅在弹窗打开期间存在于 VaultPage ref
+- 弹窗关闭时清除 ref 值
+
+**待 Cryptographer 确认**: 内存清理机制是否需要额外处理
+
+---
+
+## 技术选型分析
+
+### 动画方案
+
+| 方案 | 分析 |
+|------|------|
+| CSS Transition | ✅ 简单高效、无需库、符合性能要求≤200ms |
+| JS动画库 | ❌ 增加依赖、复杂度高 |
+
+**选择**: CSS opacity transition，复用 TransitionGroup 现有动画
+
+### 状态管理方案
+
+| 状态 | 存放位置 |
+|------|----------|
+| editingEntry | VaultPage ref（UI状态） |
+| editingDecryptedPassword | VaultPage ref（临时数据） |
+| showDeleteConfirm | VaultPage ref（UI状态） |
+| deletingEntryId | VaultPage ref（临时数据） |
+
+---
+
+## 输出产物清单
+
+| 产物 | 路径 |
+|------|------|
+| 架构设计文档 | `.agents/docs/architecture/20260406_architect-20260406001.md` |
+| API设计规范 | `.agents/docs/api-design/20260406_architect-api-20260406001.md` |
+| 工作日志 | `.agents/docs/logs/20260406_architect-20260406001.log` |
+
+---
+
+## 待下游处理事项
+
+### 传递给 Cryptographer
+
+- [ ] 确认编辑模式密码解密显示的安全风险评估
+- [ ] 确认内存清理机制需求
+- [ ] 确认密码掩码显示方案
+
+### 传递给 Developer
+
+- [ ] 按架构文档改动清单实现功能
+- [ ] 参考 UI规范文档样式要求
+- [ ] 参考 API设计文档接口定义
+
+---
+
+## 任务跟踪表更新
+
+| 步骤 | 状态 | 文档路径 |
+|------|------|----------|
+| 需求分析 | ✅ | `.agents/docs/requirements/...` |
+| UI设计 | ✅ | `.agents/docs/ui-specs/...` |
+| 架构设计 | ✅ | `.agents/docs/architecture/20260406_architect-20260406001.md` |
+| 加密方案 | 待开始 | - |
+| 代码实现 | 待开始 | - |
+
+---
+
+*日志完成时间: 2026-04-07*
+*架构师Agent: architect*
+
+---
+
+## 2026-04-07 审阅 Cryptographer 安全建议
+
+### 输入文件
+
+| 文件路径 | 用途 |
+|----------|------|
+| `.agents/docs/crypto-specs/20260407_cryptographer-20260406001.md` | 加密安全方案 |
+| `.agents/docs/logs/20260407_cryptographer-20260406001.log` | 加密审计日志 |
+| `electron/crypto.ts` | 加密模块实现 |
+
+### 待确认事项
+
+1. **IV长度修正**: 16字节→12字节（NIST推荐）
+2. **密钥传递声明不一致**: 架构文档声明与实际实现不符
+3. **剪贴板清除时机**: 30秒是否合适
+4. **密码掩码显示**: 编辑弹窗安全显示方案
+
+### 架构决策记录
+
+#### ADR-006: IV长度修正
+
+**决策**: 接受 Cryptographer 建议，IV_LENGTH 从 16字节修正为 12字节
+
+**背景**: NIST SP 800-38D 明确推荐 AES-GCM 使用 12字节 IV
+
+**迁移策略**:
+- 解密时自动检测 IV 长度，兼容旧格式
+- 新加密数据使用 12字节 IV
+- 编辑条目时自动迁移到新格式
+
+---
+
+#### ADR-007: 密钥传递声明修正
+
+**决策**: 修正架构文档声明，如实说明密钥传递机制
+
+**背景**: 
+- 原声明："主密码永不离开渲染进程传递给主进程"
+- 实际实现：每次IPC调用传递 masterKey 字符串
+
+**理由**:
+- Electron IPC 在可信边界内（同一应用的不同进程）
+- 短期不重构 IPC 架构
+- 长期可考虑 Session 模式
+
+---
+
+#### ADR-008: 剪贴板安全方案
+
+**决策**: 采用 30秒自动清除剪贴板方案
+
+**背景**: 剪贴板数据可能被其他应用读取（剪贴板历史、云同步）
+
+**实现**: 
+```typescript
+setTimeout(async () => {
+  await navigator.clipboard.writeText('')
+  copiedEntryId.value = null
+}, 30000)
+```
+
+---
+
+#### ADR-009: 编辑密码掩码显示
+
+**决策**: 编辑弹窗密码字段采用掩码显示+点击显示+自动隐藏
+
+**行为定义**:
+1. 默认掩码显示 `****`
+2. 点击眼睛图标切换明文
+3. 明文显示 5秒后自动恢复掩码
+4. 失焦时立即恢复掩码
+
+---
+
+### 更新的输出产物
+
+| 产物 | 更新内容 |
+|------|----------|
+| 架构文档 | 安全架构章节、文件改动清单、待确认事项 |
+| 任务文件 | ADR决策记录、任务历史 |
+
+### 下游传递
+
+**Developer Agent**:
+- 实现功能 + 安全增强改动
+- 注意 IV 长度修正和剪贴板清除逻辑
+
+---
+
+*审阅完成时间: 2026-04-07*
+*架构师Agent: architect*

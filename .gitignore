@@ -28,6 +28,11 @@ release/
 .agents/docs/*.tmp
 !.agents/docs/.gitkeep
 
+# .agents/docs/logs 中的日志纳入版本管理
+!.agents/docs/logs/
+!.agents/docs/logs/*/
+!.agents/docs/logs/*/*.log
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -25,6 +25,16 @@ export interface NewEntryInput {
   notes?: string
 }
 
+// 编辑密码条目输入类型（密码可选，仅修改时传入）
+export interface EditEntryInput {
+  title: string
+  username?: string
+  password?: string  // 可选，未修改时不需要重新加密
+  site?: string
+  url?: string
+  notes?: string
+}
+
 // 密码库状态
 export const useVaultStore = defineStore('vault', () => {
   // 状态
@@ -35,6 +45,7 @@ export const useVaultStore = defineStore('vault', () => {
   const searchQuery = ref('')
   const copiedEntryId = ref<string | null>(null)
   const loading = ref(false)
+  const clipboardClearTimer = ref<number | null>(null)  // 剪贴板清除定时器
 
   // 计算属性
   const entryCount = computed(() => entries.value.length)
@@ -60,6 +71,17 @@ export const useVaultStore = defineStore('vault', () => {
 
   // 锁定密码库
   function lock() {
+    // 清除剪贴板定时器
+    if (clipboardClearTimer.value !== null) {
+      clearTimeout(clipboardClearTimer.value)
+      clipboardClearTimer.value = null
+    }
+    
+    // 尝试立即清除剪贴板（安全增强）
+    navigator.clipboard.writeText('').catch(() => {
+      // 忽略清除失败
+    })
+    
     masterKey.value = null
     isLocked.value = true
     entries.value = []
@@ -121,7 +143,7 @@ export const useVaultStore = defineStore('vault', () => {
     return entry
   }
 
-  // 复制密码到剪贴板
+  // 复制密码到剪贴板（30秒后自动清除）
   async function copyPassword(entryId: string): Promise<void> {
     if (!masterKey.value) {
       throw new Error('Vault is locked')
@@ -138,16 +160,28 @@ export const useVaultStore = defineStore('vault', () => {
       masterKey.value
     )
 
+    // 清除之前的定时器
+    if (clipboardClearTimer.value !== null) {
+      clearTimeout(clipboardClearTimer.value)
+      clipboardClearTimer.value = null
+    }
+
     // 写入剪贴板
     await navigator.clipboard.writeText(plaintext)
 
     // 设置复制状态
     copiedEntryId.value = entryId
 
-    // 1.5秒后清除状态
-    setTimeout(() => {
+    // 30秒后清除剪贴板和状态
+    clipboardClearTimer.value = window.setTimeout(async () => {
+      try {
+        await navigator.clipboard.writeText('')
+      } catch {
+        // 忽略清除失败
+      }
       copiedEntryId.value = null
-    }, 1500)
+      clipboardClearTimer.value = null
+    }, 30000)  // 30秒
   }
 
   // 切换弹窗状态
@@ -173,7 +207,7 @@ export const useVaultStore = defineStore('vault', () => {
     return newEntry
   }
 
-  // 更新条目
+  // 更新条目（本地操作）
   function updateEntry(id: string, updates: Partial<Omit<VaultEntry, 'id' | 'createdAt'>>) {
     const index = entries.value.findIndex(e => e.id === id)
     if (index !== -1) {
@@ -185,6 +219,68 @@ export const useVaultStore = defineStore('vault', () => {
       return true
     }
     return false
+  }
+
+  // 编辑条目（加密并更新）
+  async function editEntry(id: string, input: EditEntryInput): Promise<VaultEntry> {
+    if (!masterKey.value) {
+      throw new Error('Vault is locked')
+    }
+
+    const index = entries.value.findIndex(e => e.id === id)
+    if (index === -1) {
+      throw new Error('Entry not found')
+    }
+
+    // 构建 updates 对象
+    const updates: Partial<VaultEntry> = {
+      title: input.title,
+      username: input.username ?? '',
+      site: input.site,
+      url: input.url,
+      notes: input.notes,
+      updatedAt: Date.now(),
+    }
+
+    // 如果密码有修改，加密新密码
+    if (input.password) {
+      const encryptedPassword = await window.electronAPI.crypto.encrypt(
+        input.password,
+        masterKey.value
+      )
+      updates.password = encryptedPassword
+    }
+
+    // 更新数据库
+    await window.electronAPI.db.updateEntry(id, updates)
+
+    // 更新本地状态
+    entries.value[index] = {
+      ...entries.value[index],
+      ...updates,
+    }
+
+    return entries.value[index]
+  }
+
+  // 获取解密后的密码（供编辑弹窗使用）
+  async function getDecryptedPassword(entryId: string): Promise<string> {
+    if (!masterKey.value) {
+      throw new Error('Vault is locked')
+    }
+
+    const entry = entries.value.find(e => e.id === entryId)
+    if (!entry) {
+      throw new Error('Entry not found')
+    }
+
+    // 解密密码
+    const plaintext = await window.electronAPI.crypto.decrypt(
+      entry.password,
+      masterKey.value
+    )
+
+    return plaintext
   }
 
   // 删除条目
@@ -231,6 +327,8 @@ export const useVaultStore = defineStore('vault', () => {
     setSearchQuery,
     addEntry,
     updateEntry,
+    editEntry,
+    getDecryptedPassword,
     deleteEntry,
     getEntry,
     setEntries,

@@ -120,7 +120,7 @@ pnpm dev  # 启动开发模式进行测试
 - 填写日志路径
 - 记录测试结论（PASS/FAIL）
 
-**详细日志位置**：`.agents/docs/logs/{date}_qa-{task-id}.log`
+**详细日志位置**：`.agents/docs/logs/{task-id}/{date}_qa-{task-id}.log`
 
 **详细日志内容**：
 - 测试任务描述

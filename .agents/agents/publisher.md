@@ -102,7 +102,7 @@ pnpm build  # 构建生产版本
 - 填写日志路径
 - 记录版本信息
 
-**详细日志位置**：`.agents/docs/logs/{date}_publisher-{task-id}.log`
+**详细日志位置**：`.agents/docs/logs/{task-id}/{date}_publisher-{task-id}.log`
 
 **详细日志内容**：
 - 发布任务描述

@@ -79,7 +79,7 @@ description: UI/UX设计师，负责PassLock项目的用户界面设计、交互
 ### 4. 输出（Output）
 
 **输出位置**：
-- `.agents/docs/ui-specs/` - UI规范文档
+- `.agents/docs/ui-specs/{date}_ui-ux-{task-id}.md` - UI规范文档
 - `src/style.css` - 全局样式变量（仅定义，不实现具体组件）
 - 设计描述文档供Developer参考实现
 
@@ -113,7 +113,7 @@ description: UI/UX设计师，负责PassLock项目的用户界面设计、交互
 - 填写日志路径
 - 记录设计决策要点
 
-**详细日志位置**：`.agents/docs/logs/{date}_ui-ux-{task-id}.log`
+**详细日志位置**：`.agents/docs/logs/{task-id}/{date}_ui-ux-{task-id}.log`
 
 **详细日志内容**：
 - 任务描述

@@ -9,7 +9,8 @@ import {
 // 加密算法配置
 const ALGORITHM = 'aes-256-gcm'
 const KEY_LENGTH = 32 // 256 bits
-const IV_LENGTH = 16 // 128 bits
+const IV_LENGTH = 12 // 96 bits (NIST SP 800-38D 推荐)
+const IV_LENGTH_OLD = 16 // 旧格式兼容 (128 bits)
 const SALT_LENGTH = 32
 const AUTH_TAG_LENGTH = 16
 const PBKDF2_ITERATIONS = 100000
@@ -65,7 +66,7 @@ export function encrypt(plaintext: string, password: string): string {
 }
 
 /**
- * 解密数据
+ * 解密数据（兼容双格式 IV）
  * @param encryptedData Base64 编码的加密数据
  * @param password 密码
  * @returns 解密后的明文
@@ -78,11 +79,72 @@ export function decrypt(encryptedData: string, password: string): string {
   let offset = 0
   const salt = combined.subarray(offset, offset + SALT_LENGTH)
   offset += SALT_LENGTH
-  const iv = combined.subarray(offset, offset + IV_LENGTH)
-  offset += IV_LENGTH
-  const authTag = combined.subarray(offset, offset + AUTH_TAG_LENGTH)
-  offset += AUTH_TAG_LENGTH
-  const ciphertext = combined.subarray(offset)
+
+  // 自动检测 IV 长度：新格式12字节，旧格式16字节
+  // 通过计算剩余数据长度来推断 IV 长度
+  const remainingAfterSalt = combined.length - SALT_LENGTH
+  // 剩余数据 = IV + authTag + ciphertext
+  // 最小密文长度为1，所以剩余至少为 IV_LENGTH + AUTH_TAG_LENGTH + 1
+  // 尝试两种 IV 长度进行解密
+  let iv: Buffer
+  let ciphertext: Buffer
+  let authTag: Buffer
+
+  // 检测 IV 长度：尝试先使用新格式12字节
+  // 如果解密失败，再尝试旧格式16字节
+  const ivLengthNew = IV_LENGTH
+  const ivLengthOld = IV_LENGTH_OLD
+
+  // 计算两种可能的密文长度
+  const possibleCiphertextLengthNew = remainingAfterSalt - ivLengthNew - AUTH_TAG_LENGTH
+  const possibleCiphertextLengthOld = remainingAfterSalt - ivLengthOld - AUTH_TAG_LENGTH
+
+  // 根据数据长度判断使用哪种格式
+  // 如果密文长度合理（>=1），使用对应格式
+  if (possibleCiphertextLengthNew >= 1 && possibleCiphertextLengthOld < 1) {
+    // 只能是新格式
+    iv = combined.subarray(offset, offset + ivLengthNew)
+    offset += ivLengthNew
+    authTag = combined.subarray(offset, offset + AUTH_TAG_LENGTH)
+    offset += AUTH_TAG_LENGTH
+    ciphertext = combined.subarray(offset)
+  } else if (possibleCiphertextLengthOld >= 1 && possibleCiphertextLengthNew < 1) {
+    // 只能是旧格式
+    iv = combined.subarray(offset, offset + ivLengthOld)
+    offset += ivLengthOld
+    authTag = combined.subarray(offset, offset + AUTH_TAG_LENGTH)
+    offset += AUTH_TAG_LENGTH
+    ciphertext = combined.subarray(offset)
+  } else {
+    // 两种格式都可能，先尝试新格式（12字节）
+    // 如果失败再尝试旧格式（16字节）
+    try {
+      iv = combined.subarray(offset, offset + ivLengthNew)
+      offset += ivLengthNew
+      authTag = combined.subarray(offset, offset + AUTH_TAG_LENGTH)
+      offset += AUTH_TAG_LENGTH
+      ciphertext = combined.subarray(offset)
+
+      const key = deriveKey(password, salt)
+      const decipher = createDecipheriv(ALGORITHM, key, iv, {
+        authTagLength: AUTH_TAG_LENGTH,
+      })
+      decipher.setAuthTag(authTag)
+      const plaintext = Buffer.concat([
+        decipher.update(ciphertext),
+        decipher.final(),
+      ])
+      return plaintext.toString('utf8')
+    } catch {
+      // 新格式失败，尝试旧格式
+      offset = SALT_LENGTH
+      iv = combined.subarray(offset, offset + ivLengthOld)
+      offset += ivLengthOld
+      authTag = combined.subarray(offset, offset + AUTH_TAG_LENGTH)
+      offset += AUTH_TAG_LENGTH
+      ciphertext = combined.subarray(offset)
+    }
+  }
 
   // 派生密钥
   const key = deriveKey(password, salt)

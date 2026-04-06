@@ -1,15 +1,25 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useVaultStore } from '../stores/vault'
 import VaultHeader from './VaultHeader.vue'
 import PasswordCard from './PasswordCard.vue'
 import AddPasswordModal from './AddPasswordModal.vue'
-import type { NewEntryInput } from '../stores/vault'
+import ConfirmDialog from './ConfirmDialog.vue'
+import type { NewEntryInput, EditEntryInput, VaultEntry } from '../stores/vault'
 
 const vaultStore = useVaultStore()
 
 // 窗口宽度状态（用于响应式）
 const windowWidth = ref(window.innerWidth)
+
+// 编辑状态
+const editingEntry = ref<VaultEntry | null>(null)
+const editingDecryptedPassword = ref<string | null>(null)
+const showEditModal = ref(false)
+
+// 删除确认状态
+const showDeleteConfirm = ref(false)
+const deletingEntryId = ref<string | null>(null)
 
 // 处理新增按钮点击
 function handleAddClick() {
@@ -45,14 +55,84 @@ function handleCloseModal() {
   vaultStore.showModal = false
 }
 
+// 处理编辑按钮点击
+async function handleEditEntry(entryId: string) {
+  try {
+    const entry = vaultStore.getEntry(entryId)
+    if (!entry) return
+
+    // 获取解密后的密码
+    const decryptedPassword = await vaultStore.getDecryptedPassword(entryId)
+
+    // 设置编辑状态
+    editingEntry.value = entry
+    editingDecryptedPassword.value = decryptedPassword
+    showEditModal.value = true
+  } catch (error) {
+    console.error('Failed to edit entry:', error)
+  }
+}
+
+// 处理删除按钮点击
+function handleDeleteEntry(entryId: string) {
+  deletingEntryId.value = entryId
+  showDeleteConfirm.value = true
+}
+
+// 处理删除确认
+async function handleConfirmDelete() {
+  if (!deletingEntryId.value) return
+
+  try {
+    await vaultStore.deleteEntry(deletingEntryId.value)
+  } catch (error) {
+    console.error('Failed to delete entry:', error)
+  } finally {
+    showDeleteConfirm.value = false
+    deletingEntryId.value = null
+  }
+}
+
+// 处理删除取消
+function handleCancelDelete() {
+  showDeleteConfirm.value = false
+  deletingEntryId.value = null
+}
+
+// 处理编辑保存
+async function handleUpdateEntry(id: string, input: EditEntryInput) {
+  try {
+    await vaultStore.editEntry(id, input)
+    // 关闭编辑弹窗并清理状态
+    handleCloseEditModal()
+  } catch (error) {
+    console.error('Failed to update entry:', error)
+  }
+}
+
+// 关闭编辑弹窗并清理状态
+function handleCloseEditModal() {
+  showEditModal.value = false
+  editingEntry.value = null
+  editingDecryptedPassword.value = null  // 安全：清除明文密码引用
+}
+
+// resize 处理函数
+function handleResize() {
+  windowWidth.value = window.innerWidth
+}
+
 // 组件挂载时加载条目
 onMounted(async () => {
   await vaultStore.loadEntries()
   
   // 监听窗口宽度变化
-  window.addEventListener('resize', () => {
-    windowWidth.value = window.innerWidth
-  })
+  window.addEventListener('resize', handleResize)
+})
+
+// 组件卸载时移除事件监听
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
 })
 </script>
 
@@ -113,6 +193,8 @@ onMounted(async () => {
             :entry="entry"
             :is-copied="vaultStore.copiedEntryId === entry.id"
             @copy-password="handleCopyPassword"
+            @edit-entry="handleEditEntry"
+            @delete-entry="handleDeleteEntry"
           />
         </TransitionGroup>
       </div>
@@ -128,6 +210,28 @@ onMounted(async () => {
       :visible="vaultStore.showModal"
       @close="handleCloseModal"
       @save="handleSaveEntry"
+    />
+
+    <!-- 编辑密码弹窗 -->
+    <AddPasswordModal
+      :visible="showEditModal"
+      mode="edit"
+      :entry="editingEntry ?? undefined"
+      :decrypted-password="editingDecryptedPassword ?? undefined"
+      @close="handleCloseEditModal"
+      @update="handleUpdateEntry"
+    />
+
+    <!-- 删除确认对话框 -->
+    <ConfirmDialog
+      :visible="showDeleteConfirm"
+      title="确定删除该密码条目吗？"
+      message="删除后无法恢复。"
+      confirm-text="删除"
+      cancel-text="取消"
+      :danger="true"
+      @confirm="handleConfirmDelete"
+      @cancel="handleCancelDelete"
     />
   </div>
 </template>
