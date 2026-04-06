@@ -80,7 +80,7 @@ pnpm dev  # 启动开发模式进行测试
 ### 4. 输出（Output）
 
 **输出位置**：
-- `.agents/docs/test-reports/{date}_test-{task-id}.md`
+- `.agents/docs/test-reports/{date}_qa-{task-id}.md`
 
 **输出格式**：
 ```markdown
