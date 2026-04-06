@@ -1,46 +1,51 @@
 <script setup lang="ts">
+import { Transition } from 'vue'
 import { useVaultStore } from './stores/vault'
 import LockScreen from './components/LockScreen.vue'
+import VaultPage from './components/VaultPage.vue'
 
 const vaultStore = useVaultStore()
 </script>
 
 <template>
-  <!-- 锁定状态：显示锁定屏幕 -->
-  <LockScreen v-if="vaultStore.isLocked" />
-  
-  <!-- 解锁状态：显示密码列表（占位） -->
-  <div v-else class="vault">
-    <h1>密码库</h1>
-    <p>已解锁，共 {{ vaultStore.entryCount }} 条记录</p>
-    <p class="hint">（密码列表页面待开发）</p>
-  </div>
+  <Transition name="page" mode="out-in">
+    <!-- 锁定状态：显示锁定屏幕 -->
+    <LockScreen v-if="vaultStore.isLocked" key="lock" />
+    
+    <!-- 解锁状态：显示密码库页面 -->
+    <VaultPage v-else key="vault" />
+  </Transition>
 </template>
 
 <style scoped>
-.vault {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  color: #fff;
+/* 页面过渡动画 */
+.page-enter-active {
+  animation: page-in 0.3s ease;
 }
 
-.vault h1 {
-  font-size: 24px;
-  margin-bottom: 16px;
+.page-leave-active {
+  animation: page-out 0.25s ease;
 }
 
-.vault p {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-.vault .hint {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
-  margin-top: 8px;
+@keyframes page-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
 }
 </style>

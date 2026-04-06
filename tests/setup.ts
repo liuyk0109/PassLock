@@ -15,6 +15,33 @@ if (typeof window !== 'undefined') {
       return event
     }
   }
+  
+  // 修复 CustomEvent 支持
+  // @ts-ignore
+  if (!window.CustomEvent) {
+    // @ts-ignore
+    window.CustomEvent = function CustomEvent(type: string, eventInitDict?: CustomEventInit) {
+      const event = document.createEvent('CustomEvent')
+      event.initCustomEvent(
+        type,
+        eventInitDict?.bubbles ?? false,
+        eventInitDict?.cancelable ?? false,
+        eventInitDict?.detail ?? null
+      )
+      return event
+    }
+  }
+  
+  // 修复 InputEvent 支持
+  // @ts-ignore
+  if (!window.InputEvent) {
+    // @ts-ignore
+    window.InputEvent = function InputEvent(type: string, eventInitDict?: InputEventInit) {
+      const event = document.createEvent('Event')
+      event.initEvent(type, eventInitDict?.bubbles ?? false, eventInitDict?.cancelable ?? false)
+      return event
+    }
+  }
 }
 
 // Mock IntersectionObserver

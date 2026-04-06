@@ -7,10 +7,22 @@ export interface VaultEntry {
   title: string
   username: string
   password: string
+  site?: string
   url?: string
   notes?: string
+  icon?: string
   createdAt: number
   updatedAt: number
+}
+
+// 新增密码条目输入类型（明文密码，用于表单）
+export interface NewEntryInput {
+  title: string
+  username?: string
+  password: string
+  site?: string
+  url?: string
+  notes?: string
 }
 
 // 密码库状态
@@ -19,10 +31,26 @@ export const useVaultStore = defineStore('vault', () => {
   const isLocked = ref(true)
   const masterKey = ref<string | null>(null)
   const entries = ref<VaultEntry[]>([])
+  const showModal = ref(false)
+  const searchQuery = ref('')
+  const copiedEntryId = ref<string | null>(null)
+  const loading = ref(false)
 
   // 计算属性
   const entryCount = computed(() => entries.value.length)
   const isUnlocked = computed(() => !isLocked.value && masterKey.value !== null)
+  
+  // 过滤后的条目列表
+  const filteredEntries = computed(() => {
+    if (!searchQuery.value) return entries.value
+    const query = searchQuery.value.toLowerCase()
+    return entries.value.filter(e =>
+      e.title.toLowerCase().includes(query) ||
+      e.site?.toLowerCase().includes(query) ||
+      e.username.toLowerCase().includes(query) ||
+      e.notes?.toLowerCase().includes(query)
+    )
+  })
 
   // 解锁密码库
   function unlock(key: string) {
@@ -34,9 +62,105 @@ export const useVaultStore = defineStore('vault', () => {
   function lock() {
     masterKey.value = null
     isLocked.value = true
+    entries.value = []
+    showModal.value = false
+    searchQuery.value = ''
+    copiedEntryId.value = null
   }
 
-  // 添加条目
+  // 从数据库加载条目
+  async function loadEntries() {
+    loading.value = true
+    try {
+      const dbEntries = await window.electronAPI.db.getEntries()
+      entries.value = dbEntries
+    } catch (error) {
+      console.error('Failed to load entries:', error)
+      entries.value = []
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 创建新条目（加密并保存）
+  async function createEntry(input: NewEntryInput): Promise<VaultEntry> {
+    if (!masterKey.value) {
+      throw new Error('Vault is locked')
+    }
+
+    if (!input.title || !input.password) {
+      throw new Error('Title and password are required')
+    }
+
+    // 加密密码
+    const encryptedPassword = await window.electronAPI.crypto.encrypt(
+      input.password,
+      masterKey.value
+    )
+
+    // 构建条目对象
+    const now = Date.now()
+    const entry: VaultEntry = {
+      id: crypto.randomUUID(),
+      title: input.title,
+      username: input.username ?? '',
+      password: encryptedPassword,
+      site: input.site,
+      url: input.url,
+      notes: input.notes,
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    // 保存到数据库
+    await window.electronAPI.db.addEntry(entry)
+
+    // 更新本地状态（添加到顶部）
+    entries.value.unshift(entry)
+
+    return entry
+  }
+
+  // 复制密码到剪贴板
+  async function copyPassword(entryId: string): Promise<void> {
+    if (!masterKey.value) {
+      throw new Error('Vault is locked')
+    }
+
+    const entry = entries.value.find(e => e.id === entryId)
+    if (!entry) {
+      throw new Error('Entry not found')
+    }
+
+    // 解密密码
+    const plaintext = await window.electronAPI.crypto.decrypt(
+      entry.password,
+      masterKey.value
+    )
+
+    // 写入剪贴板
+    await navigator.clipboard.writeText(plaintext)
+
+    // 设置复制状态
+    copiedEntryId.value = entryId
+
+    // 1.5秒后清除状态
+    setTimeout(() => {
+      copiedEntryId.value = null
+    }, 1500)
+  }
+
+  // 切换弹窗状态
+  function toggleModal() {
+    showModal.value = !showModal.value
+  }
+
+  // 设置搜索关键词
+  function setSearchQuery(query: string) {
+    searchQuery.value = query
+  }
+
+  // 添加条目（本地操作，已弃用，使用 createEntry）
   function addEntry(entry: Omit<VaultEntry, 'id' | 'createdAt' | 'updatedAt'>) {
     const now = Date.now()
     const newEntry: VaultEntry = {
@@ -64,9 +188,10 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   // 删除条目
-  function deleteEntry(id: string) {
+  async function deleteEntry(id: string): Promise<boolean> {
     const index = entries.value.findIndex(e => e.id === id)
     if (index !== -1) {
+      await window.electronAPI.db.deleteEntry(id)
       entries.value.splice(index, 1)
       return true
     }
@@ -88,12 +213,22 @@ export const useVaultStore = defineStore('vault', () => {
     isLocked,
     masterKey,
     entries,
+    showModal,
+    searchQuery,
+    copiedEntryId,
+    loading,
     // 计算属性
     entryCount,
     isUnlocked,
+    filteredEntries,
     // 方法
     unlock,
     lock,
+    loadEntries,
+    createEntry,
+    copyPassword,
+    toggleModal,
+    setSearchQuery,
     addEntry,
     updateEntry,
     deleteEntry,

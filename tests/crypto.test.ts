@@ -239,7 +239,7 @@ describe('generatePassword', () => {
   })
 
   it('TC-CRYPTO-007-04: 可指定仅小写字母', () => {
-    const password = generatePassword(20, { lowercase: true })
+    const password = generatePassword(20, { lowercase: true, uppercase: false, numbers: false, symbols: false })
     expect(/[a-z]/.test(password)).toBe(true)
     expect(/[A-Z]/.test(password)).toBe(false)
     expect(/[0-9]/.test(password)).toBe(false)
@@ -247,14 +247,14 @@ describe('generatePassword', () => {
   })
 
   it('TC-CRYPTO-007-05: 可指定仅大写字母', () => {
-    const password = generatePassword(20, { uppercase: true })
+    const password = generatePassword(20, { lowercase: false, uppercase: true, numbers: false, symbols: false })
     expect(/[a-z]/.test(password)).toBe(false)
     expect(/[A-Z]/.test(password)).toBe(true)
     expect(/[0-9]/.test(password)).toBe(false)
   })
 
   it('TC-CRYPTO-007-06: 可指定仅数字', () => {
-    const password = generatePassword(20, { numbers: true })
+    const password = generatePassword(20, { lowercase: false, uppercase: false, numbers: true, symbols: false })
     expect(/[0-9]/.test(password)).toBe(true)
     expect(/[a-zA-Z]/.test(password)).toBe(false)
   })

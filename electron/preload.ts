@@ -8,8 +8,10 @@ type VaultEntry = {
   title: string
   username: string
   password: string
+  site?: string
   url?: string
   notes?: string
+  icon?: string
   createdAt: number
   updatedAt: number
 }

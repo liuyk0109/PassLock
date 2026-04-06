@@ -56,7 +56,7 @@ description: UI/UX设计师，负责PassLock项目的用户界面设计、交互
 - 组件层级划分
 
 **输出方案**：
-- 将设计方案写入 `.agents/docs/ui-specs/design-{feature}.md`
+- 将设计方案写入 `.agents/docs/ui-specs/{date}_ui-ux-{task-id}.md`
 - 包含：布局草图、交互流程图、组件规格说明
 
 ---

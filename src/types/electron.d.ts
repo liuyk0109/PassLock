@@ -1,4 +1,6 @@
-import type { VaultEntry } from '../stores/vault'
+import type { VaultEntry, NewEntryInput } from '../stores/vault'
+
+export type StrengthLevel = 'weak' | 'medium' | 'strong' | 'very-strong'
 
 interface PasswordOptions {
   lowercase?: boolean
@@ -19,7 +21,7 @@ interface CryptoAPI {
   createVerifyData: (password: string) => Promise<string>
   generatePassword: (length?: number, options?: PasswordOptions) => Promise<string>
   getPasswordStrength: (password: string) => Promise<number>
-  getPasswordStrengthLevel: (password: string) => Promise<'weak' | 'medium' | 'strong' | 'very-strong'>
+  getPasswordStrengthLevel: (password: string) => Promise<StrengthLevel>
 }
 
 interface DatabaseAPI {
@@ -45,4 +47,5 @@ declare global {
   }
 }
 
-export {}
+// 导出类型供外部使用
+export type { VaultEntry, NewEntryInput, PasswordOptions }
