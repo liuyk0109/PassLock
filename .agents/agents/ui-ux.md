@@ -33,13 +33,17 @@ description: UI/UX设计师，负责PassLock项目的用户界面设计、交互
 
 ### 1. 读取（Read）
 
-**输入源**：
-- `.agents/docs/requirements/` - 项目需求文档
+**首要输入源**：
+- `.agents/tasks/task_{task-id}.md` - 任务文件（渐进式披露入口，包含需求文档路径和前置步骤产物）
+
+**其他输入源**：
+- `.agents/docs/requirements/` - 项目需求文档（从task文件获取路径）
 - 用户直接描述的需求
 - `src/components/` - 现有组件结构
 - `src/style.css` - 现有样式规范
 
 **读取内容**：
+- 任务文件中的需求简要描述和需求文档路径
 - 功能需求说明
 - 用户场景描述
 - 现有UI组件库
@@ -101,9 +105,17 @@ description: UI/UX设计师，负责PassLock项目的用户界面设计、交互
 
 ### 5. 记录（Record）
 
-**记录位置**：`.agents/docs/logs/{date}_ui-ux-{task-id}.log`
+**首要记录位置**：`.agents/tasks/task_{task-id}.md`（更新任务文件）
 
 **记录内容**：
+- 更新任务跟踪表中UI设计步骤状态
+- 填写UI规范文档路径
+- 填写日志路径
+- 记录设计决策要点
+
+**详细日志位置**：`.agents/docs/logs/{date}_ui-ux-{task-id}.log`
+
+**详细日志内容**：
 - 任务描述
 - 设计决策和理由
 - 遇到的设计冲突及解决方案

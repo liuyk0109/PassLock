@@ -16,6 +16,7 @@
 
 | Agent | 职责 | 文件路径 |
 |-------|------|----------|
+| Project Manager | 需求管理、任务协调 | [.agents/agents/project-manager.md](.agents/agents/project-manager.md) |
 | UI/UX | 用户界面设计 | [.agents/agents/ui-ux.md](.agents/agents/ui-ux.md) |
 | Architect | 系统架构设计 | [.agents/agents/architect.md](.agents/agents/architect.md) |
 | Developer | 代码实现 | [.agents/agents/developer.md](.agents/agents/developer.md) |
@@ -29,11 +30,11 @@
 ## 任务流转
 
 ```
-需求 → UI/UX → Architect → Developer ← Cryptographer
-                              ↓
-                        代码审查(用户/专业团队)
-                              ↓
-                           QA → Publisher
+需求 → Project Manager → UI/UX → Architect → Developer ← Cryptographer
+              ↓                              ↓
+        需求文档/任务文件              代码审查(用户/专业团队)
+                                           ↓
+                                        QA → Publisher
 ```
 
 ---

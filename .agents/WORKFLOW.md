@@ -76,7 +76,7 @@
 - 记录任务ID、执行时间、关键决策、遇到的问题及解决方案
 - 标记任务状态（进行中/已完成/已阻塞）
 
-**输出**：任务日志文件 `.agents/tasks/{date}_{task_id}.log`
+**输出**：任务日志文件 `.agents/tasks/{date}_{task-id}.log`
 
 ---
 
@@ -97,6 +97,12 @@
 
 ```
 [用户需求]
+    │
+    ▼
+┌─────────────────┐
+│  Project Manager │ ──→ .agents/docs/requirements/
+│    项目经理       │ ──→ .agents/tasks/
+└─────────────────┘
     │
     ▼
 ┌─────────────┐
@@ -137,6 +143,7 @@
 ```
 .agents/
 ├── agents/              # Subagent定义文件
+│   ├── project-manager.md
 │   ├── ui-ux.md
 │   ├── architect.md
 │   ├── developer.md
@@ -152,6 +159,7 @@
 │   ├── review-reports/  # 审查报告
 │   └── test-reports/    # 测试报告
 ├── tasks/               # 任务记录
+│   └── task_{task-id}.md  # 任务文件（渐进式披露入口）
 └── WORKFLOW.md          # 本文件
 ```
 
@@ -169,5 +177,5 @@
 
 ## 版本规范
 
-- 工作流版本：v1.0.0
-- 最后更新：2026-04-05
+- 工作流版本：v1.1.0
+- 最后更新：2026-04-06
