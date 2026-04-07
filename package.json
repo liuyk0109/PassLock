@@ -2,6 +2,7 @@
   "name": "passlock",
   "private": true,
   "version": "0.0.1-alpha.01",
+  "license": "MIT",
   "main": "dist-electron/main.js",
   "type": "module",
   "author": "Your Name",
