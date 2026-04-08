@@ -19,6 +19,7 @@ const mockElectronAPI = {
     addEntry: vi.fn().mockResolvedValue(undefined),
     updateEntry: vi.fn().mockResolvedValue(true),
     deleteEntry: vi.fn().mockResolvedValue(true),
+    getSettings: vi.fn().mockResolvedValue({ autoLockTimeout: 5 }),
   },
 }
 
@@ -128,7 +129,7 @@ describe('loadEntries 操作', () => {
 describe('createEntry 操作', () => {
   it('TC-ASYNC-002-01: 应成功创建新条目并加密密码', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
 
     const input = {
       title: 'Test Entry',
@@ -167,7 +168,7 @@ describe('createEntry 操作', () => {
 
   it('TC-ASYNC-002-03: 空标题应抛出错误', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
 
     await expect(store.createEntry({
       title: '',
@@ -177,7 +178,7 @@ describe('createEntry 操作', () => {
 
   it('TC-ASYNC-002-04: 空密码应抛出错误', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
 
     await expect(store.createEntry({
       title: 'Test',
@@ -187,7 +188,7 @@ describe('createEntry 操作', () => {
 
   it('TC-ASYNC-002-05: 应正确处理可选字段', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
 
     const input = {
       title: 'Full Entry',
@@ -207,7 +208,7 @@ describe('createEntry 操作', () => {
 
   it('TC-ASYNC-002-06: 新条目应添加到列表顶部', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     
     // 先添加一个条目
     await store.createEntry({ title: 'First', password: 'pass1' })
@@ -220,7 +221,7 @@ describe('createEntry 操作', () => {
 
   it('TC-ASYNC-002-07: 创建时间戳应正确设置', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
 
     const beforeTime = Date.now()
     const entry = await store.createEntry({ title: 'Test', password: 'pass' })
@@ -233,7 +234,7 @@ describe('createEntry 操作', () => {
 
   it('TC-ASYNC-002-08: ID应为有效的UUID格式', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
 
     const entry = await store.createEntry({ title: 'Test', password: 'pass' })
 
@@ -244,7 +245,7 @@ describe('createEntry 操作', () => {
     mockElectronAPI.crypto.encrypt.mockRejectedValueOnce(new Error('Encryption failed'))
 
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
 
     await expect(store.createEntry({
       title: 'Test',
@@ -257,7 +258,7 @@ describe('createEntry 操作', () => {
 describe('copyPassword 操作', () => {
   it('TC-ASYNC-003-01: 应成功解密密码并复制到剪贴板', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     
     // 添加一个条目
     store.setEntries([{
@@ -303,7 +304,7 @@ describe('copyPassword 操作', () => {
 
   it('TC-ASYNC-003-03: 条目不存在应抛出错误', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
 
     await expect(store.copyPassword('non-existent-id')).rejects.toThrow('Entry not found')
   })
@@ -312,7 +313,7 @@ describe('copyPassword 操作', () => {
     vi.useFakeTimers()
     
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     store.setEntries([{
       id: 'test-id',
       title: 'Test',
@@ -340,7 +341,7 @@ describe('copyPassword 操作', () => {
     mockElectronAPI.crypto.decrypt.mockRejectedValueOnce(new Error('Decryption failed'))
 
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     store.setEntries([{
       id: 'test-id',
       title: 'Test',
@@ -499,7 +500,7 @@ describe('综合场景测试', () => {
     const store = useVaultStore()
 
     // 1. 解锁
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     expect(store.isUnlocked).toBe(true)
 
     // 2. 创建条目
@@ -555,7 +556,7 @@ describe('综合场景测试', () => {
 
   it('TC-ASYNC-006-03: 锁定时清除所有状态', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     
     // 添加数据和状态
     store.setEntries([{

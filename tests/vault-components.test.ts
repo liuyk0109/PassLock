@@ -25,6 +25,7 @@ const mockElectronAPI = {
     getEntries: vi.fn().mockResolvedValue([]),
     addEntry: vi.fn().mockResolvedValue(undefined),
     deleteEntry: vi.fn().mockResolvedValue(true),
+    getSettings: vi.fn().mockResolvedValue({ autoLockTimeout: 5 }),
   },
 }
 
@@ -505,7 +506,7 @@ describe('PasswordGenerator 组件', () => {
 describe('VaultPage 组件', () => {
   it('TC-COMP-005-01: 应正确渲染页面结构', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     
     const wrapper = mount(VaultPage, {
       global: { plugins: [createPinia()] },
@@ -519,7 +520,7 @@ describe('VaultPage 组件', () => {
 
   it('TC-COMP-005-02: 空密码库应显示空状态', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     store.setEntries([])
     
     const wrapper = mount(VaultPage, {
@@ -534,7 +535,7 @@ describe('VaultPage 组件', () => {
 
   it('TC-COMP-005-03: 有条目时应显示卡片网格', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     store.setEntries([{
       id: '1',
       title: 'Test Entry',
@@ -560,7 +561,7 @@ describe('VaultPage 组件', () => {
 
   it('TC-COMP-005-04: 应显示搜索栏（有条目时）', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     store.setEntries([{
       id: '1',
       title: 'Test',
@@ -586,7 +587,7 @@ describe('VaultPage 组件', () => {
 
   it('TC-COMP-005-05: 空密码库不应显示搜索栏', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     store.setEntries([])
     
     const wrapper = mount(VaultPage, {
@@ -604,7 +605,7 @@ describe('VaultPage 组件', () => {
 
   it('TC-COMP-005-06: 加载状态应显示spinner', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     store.loading = true
     
     const wrapper = mount(VaultPage, {
@@ -623,7 +624,7 @@ describe('VaultPage 组件', () => {
 
   it('TC-COMP-005-07: 搜索无结果应显示提示', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     store.setEntries([{
       id: '1',
       title: 'Google',
@@ -650,7 +651,7 @@ describe('VaultPage 组件', () => {
 
   it('TC-COMP-005-08: 点击新增按钮应打开弹窗', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     
     const wrapper = mount(VaultPage, {
       attachTo: document.body,

@@ -47,6 +47,12 @@ export const useVaultStore = defineStore('vault', () => {
   const loading = ref(false)
   const clipboardClearTimer = ref<number | null>(null)  // 剪贴板清除定时器
 
+  // 空闲检测状态
+  const autoLockTimeout = ref<number>(5)  // 自动锁定时间(分钟)，默认5分钟
+  const idleTimer = ref<number | null>(null)  // 空闲计时器ID
+  const isIdleDetectionActive = ref<boolean>(false)  // 检测是否激活
+  const isInitialized = ref<boolean>(false)  // 配置是否已初始化（防止竞态条件）
+
   // 计算属性
   const entryCount = computed(() => entries.value.length)
   const isUnlocked = computed(() => !isLocked.value && masterKey.value !== null)
@@ -64,13 +70,79 @@ export const useVaultStore = defineStore('vault', () => {
   })
 
   // 解锁密码库
-  function unlock(key: string) {
+  async function unlock(key: string) {
+    // 等待初始化完成（防止竞态条件）
+    if (!isInitialized.value) {
+      await initialize()
+    }
     masterKey.value = key
     isLocked.value = false
+    // 解锁后启动空闲检测
+    startIdleDetection()
+  }
+
+  // 空闲检测方法
+  // 从数据库加载自动锁定时间配置
+  async function loadAutoLockTimeout(): Promise<void> {
+    try {
+      const settings = await window.electronAPI.db.getSettings()
+      autoLockTimeout.value = settings.autoLockTimeout ?? 5
+    } catch (error) {
+      console.error('Failed to load autoLockTimeout:', error)
+      autoLockTimeout.value = 5  // 使用默认值
+    }
+  }
+
+  // 启动空闲检测
+  function startIdleDetection(): void {
+    if (isIdleDetectionActive.value) return
+
+    isIdleDetectionActive.value = true
+    resetIdleTimer()
+  }
+
+  // 停止空闲检测
+  function stopIdleDetection(): void {
+    if (idleTimer.value !== null) {
+      clearTimeout(idleTimer.value)
+      idleTimer.value = null
+    }
+    isIdleDetectionActive.value = false
+  }
+
+  // 重置空闲计时器
+  function resetIdleTimer(): void {
+    if (!isIdleDetectionActive.value) return
+
+    // 清除旧定时器
+    if (idleTimer.value !== null) {
+      clearTimeout(idleTimer.value)
+    }
+
+    // 如果配置为0，永不锁定
+    if (autoLockTimeout.value === 0) {
+      idleTimer.value = null
+      return
+    }
+
+    // 设置新定时器
+    const timeoutMs = autoLockTimeout.value * 60 * 1000
+    idleTimer.value = window.setTimeout(() => {
+      lock()  // 空闲超时，自动锁定
+    }, timeoutMs)
+  }
+
+  // 初始化（预加载配置）
+  async function initialize(): Promise<void> {
+    await loadAutoLockTimeout()
+    isInitialized.value = true
   }
 
   // 锁定密码库
   function lock() {
+    // 停止空闲检测
+    stopIdleDetection()
+
     // 清除剪贴板定时器
     if (clipboardClearTimer.value !== null) {
       clearTimeout(clipboardClearTimer.value)
@@ -313,6 +385,11 @@ export const useVaultStore = defineStore('vault', () => {
     searchQuery,
     copiedEntryId,
     loading,
+    // 空闲检测状态
+    autoLockTimeout,
+    idleTimer,
+    isIdleDetectionActive,
+    isInitialized,
     // 计算属性
     entryCount,
     isUnlocked,
@@ -332,5 +409,11 @@ export const useVaultStore = defineStore('vault', () => {
     deleteEntry,
     getEntry,
     setEntries,
+    // 空闲检测方法
+    loadAutoLockTimeout,
+    startIdleDetection,
+    stopIdleDetection,
+    resetIdleTimer,
+    initialize,
   }
 })

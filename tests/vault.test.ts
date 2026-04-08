@@ -17,6 +17,7 @@ const mockElectronAPI = {
     addEntry: vi.fn().mockResolvedValue(undefined),
     updateEntry: vi.fn().mockResolvedValue(true),
     deleteEntry: vi.fn().mockResolvedValue(true),
+    getSettings: vi.fn().mockResolvedValue({ autoLockTimeout: 5 }),
   },
 }
 
@@ -64,43 +65,43 @@ describe('VaultStore 初始化', () => {
 
 // ==================== TC-STORE-002: 解锁/锁定操作 ====================
 describe('unlock/lock 操作', () => {
-  it('TC-STORE-002-01: unlock应设置masterKey并解除锁定', () => {
+  it('TC-STORE-002-01: unlock应设置masterKey并解除锁定', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     expect(store.masterKey).toBe('masterPassword')
     expect(store.isLocked).toBe(false)
     expect(store.isUnlocked).toBe(true)
   })
 
-  it('TC-STORE-002-02: lock应清除masterKey并锁定', () => {
+  it('TC-STORE-002-02: lock应清除masterKey并锁定', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     store.lock()
     expect(store.masterKey).toBe(null)
     expect(store.isLocked).toBe(true)
     expect(store.isUnlocked).toBe(false)
   })
 
-  it('TC-STORE-002-03: 边界测试 - 空密码解锁', () => {
+  it('TC-STORE-002-03: 边界测试 - 空密码解锁', async () => {
     const store = useVaultStore()
-    store.unlock('')
+    await store.unlock('')
     expect(store.masterKey).toBe('')
     expect(store.isLocked).toBe(false)
   })
 
-  it('TC-STORE-002-04: 多次解锁应更新masterKey', () => {
+  it('TC-STORE-002-04: 多次解锁应更新masterKey', async () => {
     const store = useVaultStore()
-    store.unlock('password1')
+    await store.unlock('password1')
     expect(store.masterKey).toBe('password1')
-    store.unlock('password2')
+    await store.unlock('password2')
     expect(store.masterKey).toBe('password2')
   })
 
-  it('TC-STORE-002-05: 锁定后再次解锁应恢复正常状态', () => {
+  it('TC-STORE-002-05: 锁定后再次解锁应恢复正常状态', async () => {
     const store = useVaultStore()
-    store.unlock('password')
+    await store.unlock('password')
     store.lock()
-    store.unlock('newPassword')
+    await store.unlock('newPassword')
     expect(store.isUnlocked).toBe(true)
     expect(store.masterKey).toBe('newPassword')
   })
@@ -392,10 +393,10 @@ describe('计算属性', () => {
     expect(store.entryCount).toBe(1)
   })
 
-  it('TC-STORE-008-02: isUnlocked应反映锁定状态', () => {
+  it('TC-STORE-008-02: isUnlocked应反映锁定状态', async () => {
     const store = useVaultStore()
     expect(store.isUnlocked).toBe(false)
-    store.unlock('password')
+    await store.unlock('password')
     expect(store.isUnlocked).toBe(true)
     store.lock()
     expect(store.isUnlocked).toBe(false)
@@ -418,7 +419,7 @@ describe('综合场景', () => {
     const store = useVaultStore()
     
     // 解锁
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     expect(store.isUnlocked).toBe(true)
     
     // 添加条目
@@ -462,9 +463,9 @@ describe('综合场景', () => {
     expect(store.entryCount).toBe(8)
   })
 
-  it('TC-STORE-009-03: 锁定应清除条目数据', () => {
+  it('TC-STORE-009-03: 锁定应清除条目数据', async () => {
     const store = useVaultStore()
-    store.unlock('password')
+    await store.unlock('password')
     const entry = store.addEntry({ title: 'Test', username: 'user', password: 'pass' })
     expect(store.entries.length).toBe(1)
     
@@ -481,7 +482,7 @@ describe('综合场景', () => {
 describe('editEntry 操作', () => {
   it('TC-STORE-010-01: 应成功编辑条目并更新标题', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     
     // 先创建一个条目
     const entry = store.addEntry({ 
@@ -504,7 +505,7 @@ describe('editEntry 操作', () => {
 
   it('TC-STORE-010-02: 编辑时密码修改应重新加密', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     
     const entry = store.addEntry({ 
       title: 'Test', 
@@ -532,7 +533,7 @@ describe('editEntry 操作', () => {
   it('TC-STORE-010-03: 编辑时密码未修改不应重新加密', async () => {
     vi.clearAllMocks()
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     
     const entry = store.addEntry({ 
       title: 'Test', 
@@ -574,7 +575,7 @@ describe('editEntry 操作', () => {
 
   it('TC-STORE-010-05: 编辑不存在的条目应抛出错误', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     
     await expect(store.editEntry('non-existent-id', {
       title: 'Test',
@@ -584,7 +585,7 @@ describe('editEntry 操作', () => {
 
   it('TC-STORE-010-06: 编辑应更新updatedAt时间戳', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     
     const entry = store.addEntry({ 
       title: 'Test', 
@@ -611,7 +612,7 @@ describe('editEntry 操作', () => {
 describe('getDecryptedPassword 操作', () => {
   it('TC-STORE-011-01: 应成功解密密码', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     
     store.setEntries([{
       id: 'test-id',
@@ -648,7 +649,7 @@ describe('getDecryptedPassword 操作', () => {
 
   it('TC-STORE-011-03: 条目不存在应抛出错误', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     
     await expect(store.getDecryptedPassword('non-existent-id')).rejects.toThrow('Entry not found')
   })
@@ -660,7 +661,7 @@ describe('剪贴板安全清除', () => {
     vi.useFakeTimers()
     
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     store.setEntries([{
       id: 'test-id',
       title: 'Test',
@@ -680,7 +681,7 @@ describe('剪贴板安全清除', () => {
     vi.useFakeTimers()
     
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     store.setEntries([{
       id: 'test-id',
       title: 'Test',
@@ -703,9 +704,9 @@ describe('剪贴板安全清除', () => {
     vi.useRealTimers()
   })
 
-  it('TC-STORE-012-03: 锁定时应清除所有状态', () => {
+  it('TC-STORE-012-03: 锁定时应清除所有状态', async () => {
     const store = useVaultStore()
-    store.unlock('masterPassword')
+    await store.unlock('masterPassword')
     
     store.setEntries([{
       id: '1', title: 'Test', username: 'user', password: 'p', createdAt: 0, updatedAt: 0,
@@ -720,5 +721,148 @@ describe('剪贴板安全清除', () => {
     expect(store.isLocked).toBe(true)
     expect(store.entries.length).toBe(0)
     expect(store.copiedEntryId).toBe(null)
+  })
+})
+
+// ==================== TC-STORE-013: 空闲检测功能 ====================
+describe('空闲检测功能', () => {
+  it('TC-STORE-013-01: 初始状态应未激活空闲检测', () => {
+    const store = useVaultStore()
+    expect(store.isIdleDetectionActive).toBe(false)
+    expect(store.idleTimer).toBe(null)
+    expect(store.autoLockTimeout).toBe(5) // 默认5分钟
+  })
+
+  it('TC-STORE-013-02: 解锁后应启动空闲检测', async () => {
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+    
+    expect(store.isIdleDetectionActive).toBe(true)
+    expect(store.idleTimer).not.toBe(null)
+  })
+
+  it('TC-STORE-013-03: 锁定后应停止空闲检测', async () => {
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+    expect(store.isIdleDetectionActive).toBe(true)
+    
+    store.lock()
+    
+    expect(store.isIdleDetectionActive).toBe(false)
+    expect(store.idleTimer).toBe(null)
+  })
+
+  it('TC-STORE-013-04: 用户活动应重置计时器', async () => {
+    vi.useFakeTimers()
+    
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+    
+    const firstTimer = store.idleTimer
+    expect(firstTimer).not.toBe(null)
+    
+    // 模拟用户活动
+    store.resetIdleTimer()
+    
+    // 计时器应该被重置（新定时器ID不同）
+    expect(store.idleTimer).not.toBe(firstTimer)
+    
+    vi.useRealTimers()
+  })
+
+  it('TC-STORE-013-05: 未激活时空闲检测重置无效', () => {
+    const store = useVaultStore()
+    // 默认未激活
+    expect(store.isIdleDetectionActive).toBe(false)
+    
+    // 重置应该无效（不抛出错误）
+    store.resetIdleTimer()
+    expect(store.idleTimer).toBe(null)
+  })
+
+  it('TC-STORE-013-06: autoLockTimeout为0时永不锁定', async () => {
+    // 先初始化，确保不会重新加载配置
+    mockElectronAPI.db.getSettings.mockResolvedValueOnce({ autoLockTimeout: 0 })
+    
+    const store = useVaultStore()
+    await store.initialize()
+    expect(store.autoLockTimeout).toBe(0)
+    
+    await store.unlock('masterPassword')
+    expect(store.isIdleDetectionActive).toBe(true)
+    
+    // autoLockTimeout为0时，idleTimer应为null（不设置定时器）
+    expect(store.idleTimer).toBe(null)
+  })
+
+  it('TC-STORE-013-07: 空闲超时应触发锁定', async () => {
+    vi.useFakeTimers()
+    
+    // 先初始化，设置1分钟超时
+    mockElectronAPI.db.getSettings.mockResolvedValueOnce({ autoLockTimeout: 1 })
+    
+    const store = useVaultStore()
+    await store.initialize()
+    expect(store.autoLockTimeout).toBe(1)
+    
+    await store.unlock('masterPassword')
+    
+    expect(store.isLocked).toBe(false)
+    expect(store.idleTimer).not.toBe(null)
+    
+    // 快进1分钟
+    vi.advanceTimersByTime(60 * 1000)
+    
+    // 应该自动锁定
+    expect(store.isLocked).toBe(true)
+    expect(store.masterKey).toBe(null)
+    
+    vi.useRealTimers()
+  })
+
+  it('TC-STORE-013-08: 解锁后重新激活空闲检测', async () => {
+    const store = useVaultStore()
+    
+    // 第一次解锁
+    await store.unlock('masterPassword')
+    expect(store.isIdleDetectionActive).toBe(true)
+    
+    // 锁定
+    store.lock()
+    expect(store.isIdleDetectionActive).toBe(false)
+    
+    // 再次解锁
+    await store.unlock('masterPassword')
+    expect(store.isIdleDetectionActive).toBe(true)
+    expect(store.idleTimer).not.toBe(null)
+  })
+
+  it('TC-STORE-013-09: 加载配置应正确设置autoLockTimeout', async () => {
+    mockElectronAPI.db.getSettings.mockResolvedValueOnce({ autoLockTimeout: 10 })
+    
+    const store = useVaultStore()
+    await store.loadAutoLockTimeout()
+    
+    expect(store.autoLockTimeout).toBe(10)
+  })
+
+  it('TC-STORE-013-10: 配置加载失败应使用默认值', async () => {
+    mockElectronAPI.db.getSettings.mockRejectedValueOnce(new Error('DB error'))
+    
+    const store = useVaultStore()
+    await store.loadAutoLockTimeout()
+    
+    // 应使用默认值5分钟
+    expect(store.autoLockTimeout).toBe(5)
+  })
+
+  it('TC-STORE-013-11: initialize应加载配置并设置标记', async () => {
+    const store = useVaultStore()
+    expect(store.isInitialized).toBe(false)
+    
+    await store.initialize()
+    
+    expect(store.isInitialized).toBe(true)
+    expect(mockElectronAPI.db.getSettings).toHaveBeenCalled()
   })
 })

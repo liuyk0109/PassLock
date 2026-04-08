@@ -93,7 +93,7 @@ async function handleInit() {
   try {
     const verifyData = await window.electronAPI.crypto.createVerifyData(password.value)
     await window.electronAPI.db.setMasterKeyVerify(verifyData)
-    vaultStore.unlock(password.value)
+    await vaultStore.unlock(password.value)
   } catch (e) {
     error.value = '初始化失败，请重试'
     console.error(e)
@@ -123,7 +123,7 @@ async function handleUnlock() {
 
     const valid = await window.electronAPI.crypto.verifyPassword(verifyData, password.value)
     if (valid) {
-      vaultStore.unlock(password.value)
+      await vaultStore.unlock(password.value)
     } else {
       error.value = '密码错误'
     }

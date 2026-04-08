@@ -1,0 +1,165 @@
+# Developer Agent 开发日志
+
+**任务ID**: 20260408001
+**日期**: 2026-04-08
+**开发者**: Developer Agent
+
+---
+
+## 任务描述
+
+实现自动锁定功能：用户空闲超过配置时间后自动锁定密码库，在Vue应用中监听用户活动（鼠标、键盘、点击），达到空闲阈值后调用lock()方法清除所有敏感数据。
+
+---
+
+## 实现的文件清单
+
+| 文件 | 修改内容 | 行数变化 |
+|------|----------|----------|
+| `src/stores/vault.ts` | 新增空闲检测状态和方法；修改lock/unlock | +73 |
+| `src/App.vue` | 新增全局事件监听、节流函数、生命周期管理 | +55 |
+
+---
+
+## 关键实现决策
+
+### 1. vault.ts 状态设计
+- `autoLockTimeout`: 存储自动锁定时间配置（分钟），默认5分钟
+- `idleTimer`: 存储setTimeout返回的定时器ID
+- `isIdleDetectionActive`: 检测是否激活的标志位
+
+### 2. vault.ts 方法实现
+- `loadAutoLockTimeout()`: 通过IPC从数据库加载配置，失败时使用默认值5分钟
+- `startIdleDetection()`: 解锁后启动检测，设置激活标志并启动计时器
+- `stopIdleDetection()`: 锁定后停止检测，清除定时器和标志位
+- `resetIdleTimer()`: 用户活动时重置计时器，清除旧定时器设置新定时器
+- `initialize()`: 应用启动时预加载配置，避免每次解锁重复加载
+
+### 3. 特殊处理
+- 配置值为0时永不锁定（在resetIdleTimer中检查）
+- lock方法开头调用stopIdleDetection确保清理
+- unlock方法末尾调用startIdleDetection启动检测
+
+### 4. App.vue 事件监听设计
+- mousemove事件使用150ms节流，避免高频事件影响性能
+- keydown和click事件不节流，直接调用resetIdleTimer
+- 使用eventHandlers对象存储监听器引用，便于清理
+- onMounted中调用initialize()预加载配置并添加监听器
+- onUnmounted中移除所有监听器，防止内存泄漏
+
+---
+
+## 技术问题及解决方案
+
+### 问题1: TypeScript "this" 隐式类型错误
+**现象**: throttle函数中使用`fn.apply(this, args)`导致"this隐式具有类型any"错误
+**解决**: 使用箭头函数和展开运算符`fn(...args)`替代apply方法
+
+### 问题2: 节流函数类型定义
+**现象**: 原使用`any[]`作为args类型
+**解决**: 改用`unknown[]`更安全的类型定义
+
+---
+
+## 构建验证
+
+```bash
+npm run build
+```
+
+构建成功，无编译错误：
+- dist/index.html: 0.46 kB
+- dist/assets/index-CquwNptX.css: 27.43 kB
+- dist/assets/index-CgsaClK8.js: 117.23 kB
+- dist-electron/main.js: 8.15 kB
+- dist-electron/preload.js: 1.64 kB
+
+---
+
+## 待Review的问题点
+
+1. **配置值边界处理**: autoLockTimeout为0时永不锁定，是否需要UI提示？
+2. **事件监听范围**: 当前监听window事件，是否需要扩展到特定元素？
+3. **节流时间选择**: 150ms节流是否为最优值？建议QA进行性能测试验证
+
+---
+
+## 后续建议
+
+- QA测试时需验证各种空闲超时场景
+- 建议后续版本添加设置界面，允许用户自定义autoLockTimeout
+- 可考虑添加系统级别空闲检测（使用Electron powerMonitor）作为增强功能
+
+---
+
+**开发者签字**: Developer Agent
+**日期**: 2026-04-08
+
+---
+
+## 修复记录 (2026-04-08)
+
+根据代码审查报告，修复了以下问题：
+
+### 修复1: 配置加载与解锁的竞态条件
+
+**问题**: `initialize()` 是异步方法，用户可能在配置加载完成前解锁，导致空闲检测使用默认值而非实际配置。
+
+**修复内容**:
+- `vault.ts`: 新增 `isInitialized` 状态标记
+- `vault.ts`: `initialize()` 方法在加载配置后设置 `isInitialized.value = true`
+- `vault.ts`: `unlock()` 方法改为异步，在调用 `startIdleDetection()` 前等待初始化完成
+- `LockScreen.vue`: 两处 `unlock()` 调用改为 `await vaultStore.unlock(password.value)`
+
+**修复代码**:
+```typescript
+// vault.ts
+const isInitialized = ref<boolean>(false)
+
+async function initialize(): Promise<void> {
+  await loadAutoLockTimeout()
+  isInitialized.value = true
+}
+
+async function unlock(key: string) {
+  if (!isInitialized.value) {
+    await initialize()
+  }
+  masterKey.value = key
+  isLocked.value = false
+  startIdleDetection()
+}
+```
+
+### 修复2: throttle 函数类型定义优化
+
+**问题**: 使用 `Function` 类型过于宽松，TypeScript 中建议使用更具体的函数类型签名。
+
+**修复内容**:
+- `App.vue`: throttle 函数使用泛型类型定义
+
+**修复代码**:
+```typescript
+function throttle<T extends (...args: unknown[]) => void>(fn: T, delay: number): T {
+  let lastCall = 0
+  return ((...args: unknown[]) => {
+    const now = Date.now()
+    if (now - lastCall >= delay) {
+      lastCall = now
+      fn(...args)
+    }
+  }) as T
+}
+```
+
+### 构建验证
+
+修复后 `npm run build` 成功，无编译错误。
+
+### 修改文件清单
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/stores/vault.ts` | 新增 isInitialized 状态；unlock 改为异步 |
+| `src/components/LockScreen.vue` | unlock 调用改为 await |
+| `src/App.vue` | throttle 函数泛型类型定义 |
