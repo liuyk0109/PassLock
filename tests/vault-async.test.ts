@@ -13,6 +13,7 @@ const mockElectronAPI = {
     decrypt: vi.fn().mockResolvedValue('decrypted-password'),
     generatePassword: vi.fn().mockResolvedValue('GeneratedPassword123!'),
     getPasswordStrengthLevel: vi.fn().mockResolvedValue('strong'),
+    changeMasterPassword: vi.fn().mockResolvedValue({ success: true }),
   },
   db: {
     getEntries: vi.fn().mockResolvedValue([]),
@@ -565,6 +566,7 @@ describe('综合场景测试', () => {
     store.showModal = true
     store.setSearchQuery('test')
     store.copiedEntryId = '1'
+    store.setCurrentPage('settings')
 
     // 锁定
     store.lock()
@@ -576,5 +578,192 @@ describe('综合场景测试', () => {
     expect(store.showModal).toBe(false)
     expect(store.searchQuery).toBe('')
     expect(store.copiedEntryId).toBe(null)
+    expect(store.currentPage).toBe('vault')  // 锁定时重置页面状态
+  })
+})
+
+// ==================== TC-ASYNC-007: changeMasterPassword ====================
+describe('changeMasterPassword 操作', () => {
+  it('TC-ASYNC-007-01: 应成功修改主密码', async () => {
+    const store = useVaultStore()
+    await store.unlock('oldPassword')
+
+    await store.changeMasterPassword('oldPassword', 'newPassword123')
+
+    // 应调用IPC API
+    expect(mockElectronAPI.crypto.changeMasterPassword).toHaveBeenCalledWith(
+      'oldPassword',
+      'newPassword123',
+      undefined
+    )
+  })
+
+  it('TC-ASYNC-007-02: 成功后应更新masterKey为新密码', async () => {
+    const store = useVaultStore()
+    await store.unlock('oldPassword')
+
+    await store.changeMasterPassword('oldPassword', 'newPassword123')
+
+    expect(store.masterKey).toBe('newPassword123')
+  })
+
+  it('TC-ASYNC-007-03: 成功后应重新加载条目', async () => {
+    const store = useVaultStore()
+    await store.unlock('oldPassword')
+
+    await store.changeMasterPassword('oldPassword', 'newPassword123')
+
+    // 应调用getEntries重新加载
+    expect(mockElectronAPI.db.getEntries).toHaveBeenCalled()
+  })
+
+  it('TC-ASYNC-007-04: 成功后应保持解锁状态', async () => {
+    const store = useVaultStore()
+    await store.unlock('oldPassword')
+
+    await store.changeMasterPassword('oldPassword', 'newPassword123')
+
+    expect(store.isLocked).toBe(false)
+    expect(store.isUnlocked).toBe(true)
+  })
+
+  it('TC-ASYNC-007-05: 锁定状态修改密码应抛出错误', async () => {
+    const store = useVaultStore()
+    // 默认锁定状态
+
+    await expect(store.changeMasterPassword('old', 'new'))
+      .rejects.toThrow('Vault is locked')
+
+    // 不应调用IPC
+    expect(mockElectronAPI.crypto.changeMasterPassword).not.toHaveBeenCalled()
+  })
+
+  it('TC-ASYNC-007-06: 当前密码错误时应抛出错误', async () => {
+    mockElectronAPI.crypto.changeMasterPassword.mockResolvedValueOnce({
+      success: false,
+      error: '当前密码错误'
+    })
+
+    const store = useVaultStore()
+    await store.unlock('wrongPassword')
+
+    await expect(store.changeMasterPassword('wrongPassword', 'newPassword123'))
+      .rejects.toThrow('当前密码错误')
+
+    // masterKey不应被更新
+    expect(store.masterKey).toBe('wrongPassword')
+  })
+
+  it('TC-ASYNC-007-07: IPC失败时应抛出错误', async () => {
+    mockElectronAPI.crypto.changeMasterPassword.mockRejectedValueOnce(
+      new Error('IPC communication failed')
+    )
+
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+
+    await expect(store.changeMasterPassword('masterPassword', 'newPassword123'))
+      .rejects.toThrow('IPC communication failed')
+  })
+
+  it('TC-ASYNC-007-08: 应传递进度回调到IPC', async () => {
+    const onProgress = vi.fn()
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+
+    await store.changeMasterPassword('masterPassword', 'newPassword123', onProgress)
+
+    // 应传递回调函数
+    expect(mockElectronAPI.crypto.changeMasterPassword).toHaveBeenCalledWith(
+      'masterPassword',
+      'newPassword123',
+      onProgress
+    )
+  })
+
+  it('TC-ASYNC-007-09: 无进度回调时应传undefined', async () => {
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+
+    await store.changeMasterPassword('masterPassword', 'newPassword123')
+
+    expect(mockElectronAPI.crypto.changeMasterPassword).toHaveBeenCalledWith(
+      'masterPassword',
+      'newPassword123',
+      undefined
+    )
+  })
+
+  it('TC-ASYNC-007-10: 加密失败返回错误时应抛出并保持原密码', async () => {
+    mockElectronAPI.crypto.changeMasterPassword.mockResolvedValueOnce({
+      success: false,
+      error: '加密失败，数据已恢复'
+    })
+
+    const store = useVaultStore()
+    await store.unlock('originalPassword')
+
+    await expect(store.changeMasterPassword('originalPassword', 'newPassword123'))
+      .rejects.toThrow('加密失败，数据已恢复')
+
+    // masterKey应保持不变
+    expect(store.masterKey).toBe('originalPassword')
+  })
+
+  it('TC-ASYNC-007-11: 验证数据不存在时应返回错误', async () => {
+    mockElectronAPI.crypto.changeMasterPassword.mockResolvedValueOnce({
+      success: false,
+      error: '验证数据不存在'
+    })
+
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+
+    await expect(store.changeMasterPassword('masterPassword', 'newPassword123'))
+      .rejects.toThrow('验证数据不存在')
+  })
+
+  it('TC-ASYNC-007-12: 修改密码后用新密码可正常操作', async () => {
+    const store = useVaultStore()
+    await store.unlock('oldPassword')
+
+    await store.changeMasterPassword('oldPassword', 'newPassword123')
+
+    // 使用新密码应能正常创建条目
+    const entry = await store.createEntry({
+      title: 'Test After Change',
+      password: 'test-pass',
+    })
+
+    expect(mockElectronAPI.crypto.encrypt).toHaveBeenCalledWith(
+      'test-pass',
+      'newPassword123'
+    )
+    expect(entry).toBeDefined()
+  })
+
+  it('TC-ASYNC-007-13: 空密码库修改密码应成功（仅更新验证数据）', async () => {
+    // 空密码库场景 - changeMasterPassword成功
+    const store = useVaultStore()
+    await store.unlock('oldPassword')
+    store.setEntries([])  // 空密码库
+
+    await store.changeMasterPassword('oldPassword', 'newPassword123')
+
+    expect(store.masterKey).toBe('newPassword123')
+    expect(mockElectronAPI.crypto.changeMasterPassword).toHaveBeenCalled()
+  })
+
+  it('TC-ASYNC-007-14: 默认错误消息应为"修改密码失败"', async () => {
+    mockElectronAPI.crypto.changeMasterPassword.mockResolvedValueOnce({
+      success: false,
+      error: undefined
+    })
+
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+
+    await expect(store.changeMasterPassword('masterPassword', 'newPassword123'))
+      .rejects.toThrow('修改密码失败')
   })
 })

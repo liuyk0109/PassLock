@@ -1,0 +1,132 @@
+# 架构设计日志 - 数据备份与恢复功能
+
+**任务ID**：20260410002
+**日期**：2026-04-10
+**角色**：Architect Agent
+
+---
+
+## 任务描述
+
+为PassLock数据备份与恢复功能设计系统架构，包括：
+- 备份JSON数据格式规范
+- IPC API协议设计
+- 冲突检测与处理逻辑
+- 状态管理方案
+- 安全架构与数据流
+
+---
+
+## 架构决策和理由（ADR格式）
+
+### ADR-001: 备份格式 - 密码保持加密，验证数据一并导出
+
+- **背景**：需确定备份文件的加密策略
+- **决策**：密码条目在备份文件中保持AES-256-GCM加密状态，验证数据(masterKeyVerify)一并导出
+- **理由**：
+  1. 安全性：备份文件被窃取时无法获取明文密码
+  2. 可验证性：验证数据允许导入时确认密码匹配
+  3. 跨设备恢复：同一主密码可在不同设备恢复数据
+  4. 无需额外加密层：条目已加密，无需对备份文件再加密
+- **权衡**：导入时必须使用与导出时相同的主密码
+
+### ADR-002: IPC拆分 - 细粒度通道而非单一接口
+
+- **背景**：需确定渲染进程与主进程的IPC通信粒度
+- **决策**：将备份操作拆分为5个独立IPC通道（exportData / validateBackup / parseBackup / checkConflicts / importData），加上2个对话框通道
+- **理由**：
+  1. 安全分层：密码验证在主进程完成
+  2. 流程可控：每个步骤可独立调用
+  3. 数据最小化：渲染进程仅在需要时获取必要数据
+  4. 错误隔离：单个步骤失败不影响其他步骤
+- **权衡**：IPC调用次数增加，但单次数据量更小
+
+### ADR-003: 冲突检测在主进程执行
+
+- **背景**：需确定冲突检测逻辑的执行位置
+- **决策**：冲突检测在主进程执行，仅将冲突条目的元信息（标题、用户名、时间）传递给渲染进程
+- **理由**：
+  1. 安全性：密码字段不需要传到渲染进程进行比对
+  2. 最小化传输：仅传递必要显示字段
+  3. 主进程拥有完整数据：可直接访问本地数据库和解析的备份数据
+- **权衡**：渲染进程无法直接访问完整条目数据
+
+### ADR-004: 导入状态集成到vaultStore
+
+- **背景**：需确定导入相关状态管理的位置
+- **决策**：导入相关状态集成到vaultStore中，而非创建独立的importStore
+- **理由**：
+  1. 导入操作直接影响entries状态，需要强关联
+  2. 避免Store间通信复杂度
+  3. vaultStore的lock()可统一重置所有状态
+  4. 符合现有架构模式
+- **权衡**：vaultStore状态数量增加，但逻辑内聚性更高
+
+---
+
+## 技术选型的权衡分析
+
+### 文件对话框实现
+
+| 方案 | 优点 | 缺点 | 选择 |
+|------|------|------|------|
+| Electron dialog API | 原生体验，跨平台一致 | 需在主进程调用 | ✅ |
+| HTML input[type=file] | 无需IPC | 样式不统一，无法控制默认路径 | ❌ |
+
+### 备份文件格式
+
+| 方案 | 优点 | 缺点 | 选择 |
+|------|------|------|------|
+| JSON | 可读性好，便于调试 | 文件较大 | ✅ |
+| 二进制格式 | 文件小 | 不可读，调试困难 | ❌ |
+| 加密ZIP | 双层保护 | 实现复杂 | ❌ |
+
+### 冲突检测策略
+
+| 方案 | 优点 | 缺点 | 选择 |
+|------|------|------|------|
+| ID匹配检测 | 精确，无歧义 | 可能遗漏同内容不同ID的条目 | ✅ |
+| 内容模糊匹配 | 可检测更多冲突 | 误判率高，实现复杂 | ❌ |
+
+---
+
+## 模块影响分析
+
+### 修改文件清单
+
+1. **electron/main.ts** - 新增6个IPC handler（dialog:2 + backup:4）
+2. **electron/preload.ts** - 新增dialog和backup API命名空间
+3. **electron/database.ts** - 无需新增方法（现有addEntry/updateEntry足够）
+4. **src/stores/vault.ts** - 新增导出/导入状态和方法
+5. **src/components/Settings.vue** - 新增数据管理卡片
+6. **src/components/ImportConflictDialog.vue** - 新建冲突处理弹窗
+7. **src/types/electron.d.ts** - 新增dialog/backup类型定义
+
+### 数据流分析
+
+- **导出数据流**：vaultStore → dialog:showSaveDialog → backup:exportData → 主进程读DB写文件 → 返回结果
+- **导入数据流**：vaultStore → dialog:showOpenDialog → backup:parseBackup → backup:validateBackup → backup:checkConflicts → [用户交互] → backup:importData → 主进程写DB → 返回结果
+
+---
+
+## 输出产物清单
+
+| 产物 | 路径 | 说明 |
+|------|------|------|
+| 架构文档 | `.agents/docs/architecture/20260410_architect-20260410002.md` | 系统架构设计 |
+| API设计文档 | `.agents/docs/api-design/20260410_architect-api-20260410002.md` | IPC API接口规范 |
+| 架构日志 | `.agents/docs/logs/20260410002/20260410_architect-20260410002.log` | 本文档 |
+
+---
+
+## 下游Agent建议
+
+### Developer Agent
+- 架构文档路径：`.agents/docs/architecture/20260410_architect-20260410002.md`
+- API规范路径：`.agents/docs/api-design/20260410_architect-api-20260410002.md`
+- 实现优先级：先主进程IPC handler → 再preload → 再vaultStore → 最后UI组件
+
+### Cryptographer Agent
+- 本功能无需新增加密算法
+- 现有crypto.ts的verifyPassword/createVerifyData已满足需求
+- 备份文件中密码保持加密状态，无需额外加密方案

@@ -1,0 +1,132 @@
+# Architect Agent 设计日志
+
+**任务ID**：20260410001
+**日期**：2026-04-10
+**角色**：Architect Agent
+
+---
+
+## 任务描述
+
+为主密码修改功能设计系统架构，包括模块划分、IPC通信协议、数据流、状态管理方案和安全架构。
+
+## 输入分析
+
+### 已读取文档
+- 任务文件：`.agents/tasks/task_20260410001.md`
+- 需求文档：`.agents/docs/requirements/20260410_project-manager-20260410001.md`
+- UI规范：`.agents/docs/ui-specs/20260410_ui-ux-20260410001.md`
+
+### 已分析代码
+- `electron/crypto.ts` - 现有加密API（encrypt/decrypt/verifyPassword/createVerifyData/getPasswordStrength/getPasswordStrengthLevel）
+- `electron/database.ts` - 现有数据库API（getEntries/setEntries/getMasterKeyVerify/setMasterKeyVerify）
+- `electron/main.ts` - 现有IPC handlers
+- `electron/preload.ts` - 现有Preload API
+- `src/stores/vault.ts` - 现有Pinia Store
+- `src/App.vue` - 应用入口（页面切换逻辑）
+- `src/components/VaultHeader.vue` - 密码库Header
+- `src/components/VaultPage.vue` - 密码库页面
+- `src/components/LockScreen.vue` - 锁屏组件（密码强度、输入框参考）
+- `src/components/AddPasswordModal.vue` - 新增密码弹窗（Modal参考）
+- `src/types/electron.d.ts` - 类型声明
+- `src/types/crypto.ts` - 加密类型
+
+### 关键发现
+1. 现有crypto.ts和database.ts API完全满足密码修改需求，无需修改
+2. App.vue使用简单的v-if切换LockScreen/VaultPage，无vue-router
+3. LockScreen已有本地密码强度计算逻辑，ChangePasswordModal可复用
+4. AddPasswordModal的modal动画和结构可作为ChangePasswordModal参考
+5. VaultHeader需新增设置按钮（UI规范已定义）
+
+## 架构决策记录
+
+### ADR-001: 重加密逻辑放在主进程
+
+**决策**：在主进程中通过单一IPC handler完成所有重加密逻辑。
+
+**理由**：
+- 主密码永远不应离开主进程（安全原则）
+- 渲染进程仅传递currentPassword和newPassword参数
+- 备份和回滚在主进程内存中完成
+- 减少明文密码在进程间传输
+
+**权衡**：主进程handler逻辑较复杂，进度反馈需要额外事件通道
+
+### ADR-002: 备份使用内存快照
+
+**决策**：使用主进程内存深拷贝作为备份方案。
+
+**理由**：
+- 无文件残留风险（临时文件可能被恢复）
+- GC自动回收
+- 性能好，无需磁盘I/O
+- 数据量通常不大
+
+**权衡**：进程崩溃时备份丢失（极端情况需手动介入）
+
+### ADR-003: 页面路由使用状态切换
+
+**决策**：使用vaultStore.currentPage状态切换，不引入vue-router。
+
+**理由**：
+- 与现有App.vue架构一致（v-if切换）
+- 当前只需vault/settings两个页面
+- 减少依赖
+
+**权衡**：URL不变，未来页面增多需重构
+
+### ADR-004: 单一IPC handler
+
+**决策**：使用单个`crypto:changeMasterPassword` handler封装完整流程。
+
+**理由**：
+- 原子性保障
+- 减少IPC调用次数
+- 备份/回滚逻辑不需要跨IPC协调
+- 进度通过事件推送
+
+**权衡**：handler逻辑较长，渲染进程控制粒度粗
+
+## 技术选型权衡
+
+| 选项 | 优势 | 劣势 | 最终选择 |
+|------|------|------|----------|
+| 主进程重加密 vs 渲染进程 | 密码不离开主进程 | handler较复杂 | ✅ 主进程 |
+| 内存备份 vs 文件备份 | 无残留、快速 | 崩溃丢失 | ✅ 内存 |
+| 状态切换 vs vue-router | 简单、一致 | URL不变 | ✅ 状态切换 |
+| 单handler vs 多handler | 原子性 | 逻辑长 | ✅ 单handler |
+| IPC进度事件 vs 轮询 | 实时性 | 额外通道 | ✅ 进度事件 |
+
+## 输出产物清单
+
+| 产物 | 路径 |
+|------|------|
+| 架构设计文档 | `.agents/docs/architecture/20260410_architect-20260410001.md` |
+| API接口规范 | `.agents/docs/api-design/20260410_architect-api-20260410001.md` |
+| 设计日志 | `.agents/docs/logs/20260410001/20260410_architect-20260410001.log` |
+| 任务更新 | `.agents/tasks/task_20260410001.md` |
+
+## 文件变更清单
+
+| 文件 | 变更类型 | 说明 |
+|------|----------|------|
+| `electron/main.ts` | 修改 | 新增 `crypto:changeMasterPassword` IPC handler |
+| `electron/preload.ts` | 修改 | 新增 `changeMasterPassword` API + 进度监听 |
+| `src/types/electron.d.ts` | 修改 | 新增类型声明 |
+| `src/stores/vault.ts` | 修改 | 新增状态和方法 |
+| `src/App.vue` | 修改 | 集成Settings页面 |
+| `src/components/VaultHeader.vue` | 修改 | 新增设置按钮 |
+| `src/components/VaultPage.vue` | 修改 | 传递settings-click事件 |
+| `src/components/Settings.vue` | 新建 | 设置页面 |
+| `src/components/ChangePasswordModal.vue` | 新建 | 修改密码弹窗 |
+
+## 下游Agent建议
+
+### Cryptographer
+- 无需新增加密API，现有crypto.ts完全满足需求
+- 建议确认：AES-256-GCM在密钥轮换场景下是否有特殊注意事项
+
+### Developer
+- 按照架构文档和API规范实现
+- 重点注意：主进程handler的原子性和错误回滚
+- 组件实现参考LockScreen（密码强度）和AddPasswordModal（Modal结构）

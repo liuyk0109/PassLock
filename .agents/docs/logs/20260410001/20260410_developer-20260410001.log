@@ -1,0 +1,71 @@
+# 主密码修改功能 - 开发实现日志
+
+**任务ID**：20260410001
+**日期**：2026-04-10
+**Agent**：Developer
+**状态**：已完成
+
+---
+
+## 任务描述
+
+实现主密码修改功能的完整代码，包括主进程IPC handler、preload桥接、类型定义、状态管理、UI组件。
+
+---
+
+## 实现的文件清单
+
+| 文件 | 变更类型 | 说明 |
+|------|----------|------|
+| `electron/main.ts` | 修改 | 新增 `crypto:changeMasterPassword` IPC handler |
+| `electron/preload.ts` | 修改 | 新增 `changeMasterPassword` API + 进度回调 |
+| `src/types/electron.d.ts` | 修改 | 新增 `ChangeMasterPasswordResult` 类型 |
+| `src/stores/vault.ts` | 修改 | 新增 `currentPage`/`changeMasterPassword`/`setCurrentPage` |
+| `src/components/Settings.vue` | 新建 | 设置页面 |
+| `src/components/ChangePasswordModal.vue` | 新建 | 修改密码弹窗 |
+| `src/App.vue` | 修改 | 集成Settings页面切换 |
+| `src/components/VaultHeader.vue` | 修改 | 新增设置按钮 |
+| `src/components/VaultPage.vue` | 修改 | 传递settings-click事件 |
+
+---
+
+## 关键实现决策
+
+### 1. 主进程handler原子性保障
+- 严格遵循架构文档ADR-004：单一handler封装完整流程
+- 执行顺序：验证 → 备份 → 重加密 → 写入 → 更新验证数据
+- 任一环节失败自动回滚，try-catch-finally保障
+- 遵循密码专家建议：明文密码变量使用后置空 `plaintext = ''`
+
+### 2. 安全编码实践
+- 错误信息仅返回用户友好文本，不泄露加密细节
+- 进度事件仅发送序号 `(current, total)`，不含明文
+- finally块确保备份引用置null，保障内存安全
+- 备份使用JSON深拷贝，无文件残留
+
+### 3. UI交互细节
+- 空密码库场景：进度条直接100%，文字显示"正在更新验证数据..."
+- 加密进行中禁止关闭弹窗（ESC/背景点击均无效）
+- lock()时重置currentPage为'vault'，防止锁定后仍在设置页
+- 密码强度本地计算（不调用IPC），实时反馈
+
+---
+
+## 遇到的技术问题及解决方案
+
+无重大技术问题。所有实现严格遵循架构文档和API规范。
+
+---
+
+## 需要Review的关键点
+
+1. **主进程handler的回滚逻辑**：`electron/main.ts` 中 `crypto:changeMasterPassword` handler 的 try-catch-finally 结构
+2. **preload进度监听器清理**：`electron/preload.ts` 中 `finally` 块确保 `removeAllListeners`
+3. **密码强度校验阈值**：`ChangePasswordModal.vue` 中 `level >= 2` 确保medium以上
+4. **空密码库处理**：`ChangePasswordModal.vue` 中 `progress.total === 0` 时的进度显示
+
+---
+
+*开发实现完成时间: 2026-04-10*
+*Developer Agent*
+*任务ID: 20260410001*

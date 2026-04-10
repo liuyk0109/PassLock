@@ -11,6 +11,8 @@ import PasswordCard from '../src/components/PasswordCard.vue'
 import AddPasswordModal from '../src/components/AddPasswordModal.vue'
 import PasswordGenerator from '../src/components/PasswordGenerator.vue'
 import ConfirmDialog from '../src/components/ConfirmDialog.vue'
+import Settings from '../src/components/Settings.vue'
+import ChangePasswordModal from '../src/components/ChangePasswordModal.vue'
 import { useVaultStore, type VaultEntry } from '../src/stores/vault'
 
 // Mock Electron API
@@ -20,6 +22,7 @@ const mockElectronAPI = {
     decrypt: vi.fn().mockResolvedValue('decrypted-password'),
     generatePassword: vi.fn().mockResolvedValue('GeneratedPassword123!'),
     getPasswordStrengthLevel: vi.fn().mockResolvedValue('strong'),
+    changeMasterPassword: vi.fn().mockResolvedValue({ success: true }),
   },
   db: {
     getEntries: vi.fn().mockResolvedValue([]),
@@ -46,6 +49,8 @@ beforeEach(() => {
 afterEach(() => {
   // 清理mock
   delete (window as any).electronAPI
+  // 清理可能残留的 Teleport DOM
+  document.body.innerHTML = ''
 })
 
 // ==================== TC-COMP-001: VaultHeader 组件 ====================
@@ -108,6 +113,33 @@ describe('VaultHeader 组件', () => {
     
     // 检查按钮文本
     expect(btn.text()).toContain('新增')
+  })
+
+  it('TC-COMP-001-07: 应显示设置按钮', () => {
+    const wrapper = mount(VaultHeader, {
+      global: { plugins: [createPinia()] },
+    })
+
+    expect(wrapper.find('.btn-settings').exists()).toBe(true)
+  })
+
+  it('TC-COMP-001-08: 点击设置按钮应触发settings-click事件', async () => {
+    const wrapper = mount(VaultHeader, {
+      global: { plugins: [createPinia()] },
+    })
+
+    await wrapper.find('.btn-settings').trigger('click')
+
+    expect(wrapper.emitted('settings-click')).toBeTruthy()
+    expect(wrapper.emitted('settings-click')?.length).toBe(1)
+  })
+
+  it('TC-COMP-001-09: 设置按钮应有正确的title属性', () => {
+    const wrapper = mount(VaultHeader, {
+      global: { plugins: [createPinia()] },
+    })
+
+    expect(wrapper.find('.btn-settings').attributes('title')).toBe('设置')
   })
 })
 
@@ -214,11 +246,21 @@ describe('PasswordCard 组件', () => {
 })
 
 // ==================== TC-COMP-003: AddPasswordModal 组件 ====================
+
+// Modal 组件通用 mount 配置（stub Teleport 和 Transition）
+const modalGlobalConfig = () => ({
+  plugins: [createPinia()],
+  stubs: {
+    Teleport: { template: '<slot />' },
+    Transition: { template: '<slot />' },
+  }
+})
+
 describe('AddPasswordModal 组件', () => {
   it('TC-COMP-003-01: visible为false时不应显示', () => {
     const wrapper = mount(AddPasswordModal, {
       props: { visible: false },
-      global: { plugins: [createPinia()] },
+      global: modalGlobalConfig(),
     })
 
     expect(wrapper.find('.modal-backdrop').exists()).toBe(false)
@@ -227,7 +269,7 @@ describe('AddPasswordModal 组件', () => {
   it('TC-COMP-003-02: visible为true时应显示弹窗', async () => {
     const wrapper = mount(AddPasswordModal, {
       props: { visible: true },
-      global: { plugins: [createPinia()] },
+      global: modalGlobalConfig(),
     })
 
     await flushPromises()
@@ -239,7 +281,7 @@ describe('AddPasswordModal 组件', () => {
   it('TC-COMP-003-03: 应包含所有必填字段', async () => {
     const wrapper = mount(AddPasswordModal, {
       props: { visible: true },
-      global: { plugins: [createPinia()] },
+      global: modalGlobalConfig(),
     })
 
     await flushPromises()
@@ -254,7 +296,7 @@ describe('AddPasswordModal 组件', () => {
   it('TC-COMP-003-04: 点击关闭按钮应触发close事件', async () => {
     const wrapper = mount(AddPasswordModal, {
       props: { visible: true },
-      global: { plugins: [createPinia()] },
+      global: modalGlobalConfig(),
     })
 
     await flushPromises()
@@ -266,7 +308,7 @@ describe('AddPasswordModal 组件', () => {
   it('TC-COMP-003-05: 点击取消按钮应触发close事件', async () => {
     const wrapper = mount(AddPasswordModal, {
       props: { visible: true },
-      global: { plugins: [createPinia()] },
+      global: modalGlobalConfig(),
     })
 
     await flushPromises()
@@ -275,123 +317,96 @@ describe('AddPasswordModal 组件', () => {
     expect(wrapper.emitted('close')).toBeTruthy()
   })
 
-  it('TC-COMP-003-06: 空表单提交应显示错误', async () => {
+  it('TC-COMP-003-06: 空表单时保存按钮应禁用', async () => {
     const wrapper = mount(AddPasswordModal, {
       props: { visible: true },
-      global: { plugins: [createPinia()] },
+      global: modalGlobalConfig(),
     })
 
     await flushPromises()
     
-    // 直接调用保存方法（不填写表单）
-    await wrapper.find('.btn-save').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.find('.error-box').exists()).toBe(true)
+    // 空表单时保存按钮应禁用（formValid为false）
+    const saveBtn = wrapper.find('.btn-save')
+    expect(saveBtn.exists()).toBe(true)
+    expect((saveBtn.element as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('TC-COMP-003-07: 填写完整表单提交应触发save事件', async () => {
     const wrapper = mount(AddPasswordModal, {
       props: { visible: true },
-      attachTo: document.body,
-      global: { plugins: [createPinia()] },
+      global: modalGlobalConfig(),
     })
 
     await flushPromises()
-    await new Promise(resolve => setTimeout(resolve, 100))
 
-    // 填写表单 - 使用更具体的选择器
-    const inputs = document.querySelectorAll('.form-input')
+    // 填写表单
+    const inputs = wrapper.findAll('.form-input')
     expect(inputs.length).toBeGreaterThan(0)
     
     // 设置名称
     if (inputs[0]) {
-      (inputs[0] as HTMLInputElement).value = 'Test Entry'
-      inputs[0].dispatchEvent(new Event('input'))
+      await inputs[0].setValue('Test Entry')
     }
     
     // 设置密码 (第3个input)
     if (inputs[2]) {
-      (inputs[2] as HTMLInputElement).value = 'test-password'
-      inputs[2].dispatchEvent(new Event('input'))
+      await inputs[2].setValue('test-password')
     }
 
     // 提交
-    const saveBtn = document.querySelector('.btn-save')
-    if (saveBtn) {
-      saveBtn.dispatchEvent(new Event('click'))
-    }
+    await wrapper.find('.btn-save').trigger('click')
     await flushPromises()
 
     expect(wrapper.emitted('save')).toBeTruthy()
-    
-    wrapper.unmount()
   })
 
   it('TC-COMP-003-08: 密码可见性切换应工作', async () => {
     const wrapper = mount(AddPasswordModal, {
       props: { visible: true },
-      attachTo: document.body,
-      global: { plugins: [createPinia()] },
+      global: modalGlobalConfig(),
     })
 
     await flushPromises()
-    await new Promise(resolve => setTimeout(resolve, 100))
 
     // 找到密码输入框
-    const inputs = document.querySelectorAll('.form-input')
+    const inputs = wrapper.findAll('.form-input')
     if (inputs.length >= 3) {
-      const passwordInput = inputs[2] as HTMLInputElement
-      expect(passwordInput.type).toBe('password')
+      expect((inputs[2].element as HTMLInputElement).type).toBe('password')
     }
-    
-    wrapper.unmount()
   })
 
   it('TC-COMP-003-09: 点击背景应触发close事件', async () => {
     const wrapper = mount(AddPasswordModal, {
       props: { visible: true },
-      attachTo: document.body,
-      global: { plugins: [createPinia()] },
+      global: modalGlobalConfig(),
     })
 
     await flushPromises()
-    await new Promise(resolve => setTimeout(resolve, 100))
     
     // 点击背景层
-    const backdrop = document.querySelector('.modal-backdrop')
-    if (backdrop) {
-      backdrop.dispatchEvent(new Event('click'))
-    }
+    await wrapper.find('.modal-backdrop').trigger('click')
     await flushPromises()
     
     expect(wrapper.emitted('close')).toBeTruthy()
-    
-    wrapper.unmount()
   })
 
   it('TC-COMP-003-10: 密码强度指示器应显示', async () => {
     const wrapper = mount(AddPasswordModal, {
       props: { visible: true },
-      attachTo: document.body,
-      global: { plugins: [createPinia()] },
+      global: modalGlobalConfig(),
     })
 
     await flushPromises()
-    await new Promise(resolve => setTimeout(resolve, 100))
 
     // 填写密码
-    const inputs = document.querySelectorAll('.form-input')
+    const inputs = wrapper.findAll('.form-input')
     if (inputs.length >= 3) {
-      const passwordInput = inputs[2] as HTMLInputElement
-      passwordInput.value = 'StrongPassword123!'
-      passwordInput.dispatchEvent(new Event('input'))
+      await inputs[2].setValue('StrongPassword123!')
     }
     await flushPromises()
 
     // 应显示强度指示器
-    const strengthIndicator = document.querySelector('.strength-indicator')
-    expect(strengthIndicator).toBeTruthy()
+    expect(wrapper.find('.strength-indicator').exists()).toBe(true)
     
     wrapper.unmount()
   })
@@ -846,5 +861,502 @@ describe('AddPasswordModal 编辑模式', () => {
   it('TC-COMP-009-02: 应支持entry prop', () => {
     // 测试组件支持entry prop
     expect(AddPasswordModal).toBeDefined()
+  })
+})
+
+// ==================== TC-COMP-010: Settings 组件 ====================
+describe('Settings 组件', () => {
+  it('TC-COMP-010-01: 应正确渲染设置页面结构', async () => {
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+
+    const wrapper = mount(Settings, {
+      global: { plugins: [createPinia()] },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('.settings-page').exists()).toBe(true)
+    expect(wrapper.find('.settings-header').exists()).toBe(true)
+    expect(wrapper.find('.settings-card').exists()).toBe(true)
+  })
+
+  it('TC-COMP-010-02: 应显示安全设置卡片', async () => {
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+
+    const wrapper = mount(Settings, {
+      global: { plugins: [createPinia()] },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('.card-title').text()).toBe('安全设置')
+  })
+
+  it('TC-COMP-010-03: 应显示"修改主密码"入口', async () => {
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+
+    const wrapper = mount(Settings, {
+      global: { plugins: [createPinia()] },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('.setting-title').text()).toBe('主密码')
+    expect(wrapper.find('.setting-desc').text()).toContain('核心密码')
+  })
+
+  it('TC-COMP-010-04: 应有返回按钮', async () => {
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+
+    const wrapper = mount(Settings, {
+      global: { plugins: [createPinia()] },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('.back-btn').exists()).toBe(true)
+  })
+
+  it('TC-COMP-010-05: 点击返回按钮应切换到vault页面', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+    store.setCurrentPage('settings')
+
+    const wrapper = mount(Settings, {
+      global: { plugins: [pinia], stubs: modalGlobalConfig().stubs },
+    })
+
+    await flushPromises()
+    await wrapper.find('.back-btn').trigger('click')
+
+    expect(store.currentPage).toBe('vault')
+  })
+
+  it('TC-COMP-010-06: 点击修改主密码应打开弹窗', async () => {
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+
+    const wrapper = mount(Settings, {
+      global: { plugins: [createPinia()] },
+    })
+
+    await flushPromises()
+
+    // 点击修改主密码行
+    await wrapper.find('.setting-item').trigger('click')
+
+    // ChangePasswordModal应被显示
+    expect(wrapper.findComponent(ChangePasswordModal).exists()).toBe(true)
+  })
+
+  it('TC-COMP-010-07: 应显示底部安全提示', async () => {
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+
+    const wrapper = mount(Settings, {
+      global: { plugins: [createPinia()] },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('.footer-text').text()).toContain('端到端加密')
+  })
+})
+
+// ==================== TC-COMP-011: ChangePasswordModal 组件 ====================
+describe('ChangePasswordModal 组件', () => {
+  // 创建共享 Pinia 实例的辅助函数（确保组件和测试使用同一个 store）
+  const createPiniaAndStore = () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    return { pinia, store: useVaultStore() }
+  }
+
+  it('TC-COMP-011-01: visible为false时不应显示', () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: false },
+      global: modalGlobalConfig(),
+    })
+
+    expect(wrapper.find('.modal-backdrop').exists()).toBe(false)
+  })
+
+  it('TC-COMP-011-02: visible为true时应显示弹窗', async () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: modalGlobalConfig(),
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('.modal-backdrop').exists()).toBe(true)
+    expect(wrapper.find('.modal-title').text()).toBe('修改主密码')
+  })
+
+  it('TC-COMP-011-03: 应包含三个密码输入框', async () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: modalGlobalConfig(),
+    })
+
+    await flushPromises()
+
+    const inputs = wrapper.findAll('.input')
+    expect(inputs.length).toBe(3)
+  })
+
+  it('TC-COMP-011-04: 应包含密码强度指示器', async () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: modalGlobalConfig(),
+    })
+
+    await flushPromises()
+
+    // 输入新密码触发强度指示器显示
+    const inputs = wrapper.findAll('.input')
+    await inputs[1].setValue('TestPassword123!')
+
+    expect(wrapper.find('.strength-indicator').exists() || wrapper.find('.strength-bar').exists()).toBe(true)
+  })
+
+  it('TC-COMP-011-05: 空表单时确认按钮应禁用', async () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: modalGlobalConfig(),
+    })
+
+    await flushPromises()
+
+    const saveBtn = wrapper.find('.btn-save')
+    expect(saveBtn.exists()).toBe(true)
+    expect((saveBtn.element as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('TC-COMP-011-06: 点击取消按钮应触发close事件', async () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: modalGlobalConfig(),
+    })
+
+    await flushPromises()
+    await wrapper.find('.btn-cancel').trigger('click')
+
+    expect(wrapper.emitted('close')).toBeTruthy()
+  })
+
+  it('TC-COMP-011-07: 点击关闭按钮应触发close事件', async () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: modalGlobalConfig(),
+    })
+
+    await flushPromises()
+    await wrapper.find('.close-btn').trigger('click')
+
+    expect(wrapper.emitted('close')).toBeTruthy()
+  })
+
+  it('TC-COMP-011-08: 弱密码时应显示强度警告', async () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: modalGlobalConfig(),
+    })
+
+    await flushPromises()
+
+    // 输入弱密码
+    const inputs = wrapper.findAll('.input')
+    await inputs[1].setValue('abc')
+
+    expect(wrapper.find('.strength-warning').exists()).toBe(true)
+  })
+
+  it('TC-COMP-011-09: 确认密码不匹配时应显示错误提示', async () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: modalGlobalConfig(),
+    })
+
+    await flushPromises()
+
+    const inputs = wrapper.findAll('.input')
+    await inputs[1].setValue('TestPassword123')
+    await inputs[2].setValue('DifferentPassword')
+
+    expect(wrapper.find('.match-error').exists()).toBe(true)
+  })
+
+  it('TC-COMP-011-10: 确认密码匹配时应显示成功提示', async () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: modalGlobalConfig(),
+    })
+
+    await flushPromises()
+
+    const inputs = wrapper.findAll('.input')
+    await inputs[1].setValue('TestPassword123')
+    await inputs[2].setValue('TestPassword123')
+
+    expect(wrapper.find('.match-success').exists()).toBe(true)
+  })
+
+  it('TC-COMP-011-11: 表单填写完整且有效时确认按钮应可用', async () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: modalGlobalConfig(),
+    })
+
+    await flushPromises()
+
+    const inputs = wrapper.findAll('.input')
+    // 当前密码
+    await inputs[0].setValue('currentPassword')
+    // 新密码（中等强度：6位+大小写+数字）
+    await inputs[1].setValue('abcDEF123')
+    // 确认密码
+    await inputs[2].setValue('abcDEF123')
+
+    const saveBtn = wrapper.find('.btn-save')
+    expect(saveBtn.exists()).toBe(true)
+    expect((saveBtn.element as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('TC-COMP-011-12: 提交时应显示进度覆盖层', async () => {
+    // 让changeMasterPassword延迟返回
+    mockElectronAPI.crypto.changeMasterPassword.mockImplementationOnce(
+      () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 200))
+    )
+
+    const { pinia, store } = createPiniaAndStore()
+    await store.unlock('masterPassword')
+
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: { plugins: [pinia], stubs: modalGlobalConfig().stubs },
+    })
+
+    await flushPromises()
+
+    const inputs = wrapper.findAll('.input')
+    await inputs[0].setValue('masterPassword')
+    await inputs[1].setValue('NewPassword123!')
+    await inputs[2].setValue('NewPassword123!')
+
+    // 点击确认修改
+    await wrapper.find('.btn-save').trigger('click')
+    await flushPromises()
+
+    // 应显示进度覆盖层
+    expect(wrapper.find('.progress-overlay').exists()).toBe(true)
+
+    // 等待完成
+    await new Promise(resolve => setTimeout(resolve, 300))
+    await flushPromises()
+  })
+
+  it('TC-COMP-011-13: 提交中不应允许关闭弹窗', async () => {
+    mockElectronAPI.crypto.changeMasterPassword.mockImplementationOnce(
+      () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 500))
+    )
+
+    const { pinia, store } = createPiniaAndStore()
+    await store.unlock('masterPassword')
+
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: { plugins: [pinia], stubs: modalGlobalConfig().stubs },
+    })
+
+    await flushPromises()
+
+    const inputs = wrapper.findAll('.input')
+    await inputs[0].setValue('masterPassword')
+    await inputs[1].setValue('NewPassword123!')
+    await inputs[2].setValue('NewPassword123!')
+
+    // 提交
+    await wrapper.find('.btn-save').trigger('click')
+    await flushPromises()
+
+    // 提交后表单被进度覆盖层替换，关闭按钮不可见
+    expect(wrapper.find('.close-btn').exists()).toBe(false)
+    // 不应触发close事件（因为正在提交中）
+    expect(wrapper.emitted('close')).toBeFalsy()
+
+    // 等待完成
+    await new Promise(resolve => setTimeout(resolve, 600))
+    await flushPromises()
+  })
+
+  it('TC-COMP-011-14: 修改成功应触发success事件', async () => {
+    const { pinia, store } = createPiniaAndStore()
+    await store.unlock('masterPassword')
+
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: { plugins: [pinia], stubs: modalGlobalConfig().stubs },
+    })
+
+    await flushPromises()
+
+    const inputs = wrapper.findAll('.input')
+    await inputs[0].setValue('masterPassword')
+    await inputs[1].setValue('NewPassword123!')
+    await inputs[2].setValue('NewPassword123!')
+
+    await wrapper.find('.btn-save').trigger('click')
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    await flushPromises()
+
+    expect(wrapper.emitted('success')).toBeTruthy()
+  })
+
+  it('TC-COMP-011-15: 修改失败应显示错误信息', async () => {
+    mockElectronAPI.crypto.changeMasterPassword.mockResolvedValueOnce({
+      success: false,
+      error: '当前密码错误'
+    })
+
+    const { pinia, store } = createPiniaAndStore()
+    await store.unlock('masterPassword')
+
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: { plugins: [pinia], stubs: modalGlobalConfig().stubs },
+    })
+
+    await flushPromises()
+
+    const inputs = wrapper.findAll('.input')
+    await inputs[0].setValue('wrongPassword')
+    await inputs[1].setValue('NewPassword123!')
+    await inputs[2].setValue('NewPassword123!')
+
+    await wrapper.find('.btn-save').trigger('click')
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    await flushPromises()
+
+    // 应显示错误信息
+    expect(wrapper.find('.error-box').exists()).toBe(true)
+    expect(wrapper.find('.error-box').text()).toContain('当前密码错误')
+  })
+
+  it('TC-COMP-011-16: 修改失败后应回到表单状态', async () => {
+    mockElectronAPI.crypto.changeMasterPassword.mockResolvedValueOnce({
+      success: false,
+      error: '当前密码错误'
+    })
+
+    const { pinia, store } = createPiniaAndStore()
+    await store.unlock('masterPassword')
+
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: { plugins: [pinia], stubs: modalGlobalConfig().stubs },
+    })
+
+    await flushPromises()
+
+    const inputs = wrapper.findAll('.input')
+    await inputs[0].setValue('wrongPassword')
+    await inputs[1].setValue('NewPassword123!')
+    await inputs[2].setValue('NewPassword123!')
+
+    await wrapper.find('.btn-save').trigger('click')
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    await flushPromises()
+
+    // 应回到表单状态（不显示进度覆盖层）
+    expect(wrapper.find('.progress-overlay').exists()).toBe(false)
+    // 表单应仍然可见
+    expect(wrapper.find('.modal-body').exists()).toBe(true)
+  })
+
+  it('TC-COMP-011-17: 应有密码可见性切换按钮', async () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: modalGlobalConfig(),
+    })
+
+    await flushPromises()
+
+    const visibilityBtns = wrapper.findAll('.visibility-btn')
+    expect(visibilityBtns.length).toBe(3)  // 当前密码、新密码、确认密码各一个
+  })
+
+  it('TC-COMP-011-18: 应显示确认密码匹配指示器', async () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: modalGlobalConfig(),
+    })
+
+    await flushPromises()
+
+    const inputs = wrapper.findAll('.input')
+    // 输入确认密码触发匹配指示器
+    await inputs[2].setValue('test')
+
+    // 匹配指示器应显示
+    expect(wrapper.find('.match-indicator').exists()).toBe(true)
+  })
+
+  it('TC-COMP-011-19: 点击背景应触发close事件', async () => {
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: modalGlobalConfig(),
+    })
+
+    await flushPromises()
+
+    // 点击背景层
+    await wrapper.find('.modal-backdrop').trigger('click')
+
+    expect(wrapper.emitted('close')).toBeTruthy()
+  })
+
+  it('TC-COMP-011-20: 提交中点击背景不应关闭弹窗', async () => {
+    mockElectronAPI.crypto.changeMasterPassword.mockImplementationOnce(
+      () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 500))
+    )
+
+    const { pinia, store } = createPiniaAndStore()
+    await store.unlock('masterPassword')
+
+    const wrapper = mount(ChangePasswordModal, {
+      props: { visible: true },
+      global: { plugins: [pinia], stubs: modalGlobalConfig().stubs },
+    })
+
+    await flushPromises()
+
+    const inputs = wrapper.findAll('.input')
+    await inputs[0].setValue('masterPassword')
+    await inputs[1].setValue('NewPassword123!')
+    await inputs[2].setValue('NewPassword123!')
+
+    // 提交
+    await wrapper.find('.btn-save').trigger('click')
+    await flushPromises()
+
+    // 点击背景层
+    await wrapper.find('.modal-backdrop').trigger('click')
+
+    // 不应触发close事件
+    expect(wrapper.emitted('close')).toBeFalsy()
+
+    // 等待完成
+    await new Promise(resolve => setTimeout(resolve, 600))
+    await flushPromises()
   })
 })

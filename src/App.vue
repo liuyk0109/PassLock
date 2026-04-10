@@ -3,6 +3,7 @@ import { Transition, onMounted, onUnmounted } from 'vue'
 import { useVaultStore } from './stores/vault'
 import LockScreen from './components/LockScreen.vue'
 import VaultPage from './components/VaultPage.vue'
+import Settings from './components/Settings.vue'
 
 const vaultStore = useVaultStore()
 
@@ -66,6 +67,9 @@ onUnmounted(() => {
     <!-- 锁定状态：显示锁定屏幕 -->
     <LockScreen v-if="vaultStore.isLocked" key="lock" />
     
+    <!-- 设置页面 -->
+    <Settings v-else-if="vaultStore.currentPage === 'settings'" key="settings" />
+
     <!-- 解锁状态：显示密码库页面 -->
     <VaultPage v-else key="vault" />
   </Transition>

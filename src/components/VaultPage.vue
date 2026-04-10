@@ -31,6 +31,11 @@ function handleLockClick() {
   vaultStore.lock()
 }
 
+// 处理设置按钮点击
+function handleSettingsClick() {
+  vaultStore.setCurrentPage('settings')
+}
+
 // 处理复制密码
 async function handleCopyPassword(entryId: string) {
   try {
@@ -149,6 +154,7 @@ onUnmounted(() => {
       :entry-count="vaultStore.entryCount"
       @add-click="handleAddClick"
       @lock-click="handleLockClick"
+      @settings-click="handleSettingsClick"
     />
 
     <!-- 卡片网格区域 -->

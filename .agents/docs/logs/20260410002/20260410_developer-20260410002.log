@@ -1,0 +1,99 @@
+# 数据备份与恢复功能 - 开发者日志
+
+**任务ID**：20260410002
+**日期**：2026-04-10
+**开发者**：Developer Agent
+
+---
+
+## 任务描述
+
+实现PassLock密码管理器的数据备份与恢复功能，包括：
+- 导出加密的密码库数据为JSON文件
+- 导入备份文件恢复数据
+- 导入时冲突检测和逐条解决
+
+## 实现文件清单
+
+| 文件 | 变更类型 | 说明 |
+|------|----------|------|
+| `electron/main.ts` | 修改 | 新增7个IPC handler（dialog:2 + backup:5） |
+| `electron/preload.ts` | 修改 | 新增dialog和backup API命名空间 |
+| `src/types/electron.d.ts` | 修改 | 新增dialog/backup类型定义 |
+| `src/stores/vault.ts` | 修改 | 新增导出/导入状态和方法、Toast状态 |
+| `src/components/Settings.vue` | 修改 | 新增数据管理卡片、导入验证弹窗、Toast |
+| `src/components/ImportConflictDialog.vue` | 新建 | 冲突处理弹窗组件 |
+
+## 关键实现决策
+
+1. **复用database.ts方法**：现有的`getEntries()`、`addEntry()`、`updateEntry()`等方法已满足导入需求，无需新增`batchImportEntries()`方法。虽然每次addEntry/updateEntry都会写入磁盘，但数据量通常不大，性能可接受。
+
+2. **导入验证弹窗内联**：导入时的主密码验证弹窗直接在Settings.vue中实现，而非独立组件。原因是该弹窗逻辑简单，且与Settings的导入流程紧密关联。
+
+3. **冲突处理弹窗独立**：ImportConflictDialog.vue作为独立组件，因为其逻辑复杂（冲突列表、逐条操作、快捷操作），且需要复用性。
+
+4. **Toast状态集成到vaultStore**：Toast状态放在vaultStore中全局共享，避免在Settings和ImportConflictDialog之间传递Toast回调。
+
+5. **锁定时重置导入/导出状态**：`lock()`方法中调用`resetImportState()`和`resetExportState()`，确保锁定后所有导入/导出相关状态被清理。
+
+## 遇到的技术问题
+
+### 1. vault.ts中lock()调用resetImportState()的顺序
+- **问题**：`lock()`方法中调用了尚未定义的`resetImportState()`和`resetExportState()`
+- **解决**：JavaScript函数声明会提升（hoisting），所以在同一作用域内可以先调用后定义，不构成问题
+
+### 2. conflictResolutions的响应式更新
+- **问题**：`Map<string, ConflictAction>`的`.set()`操作不会触发Vue响应式更新
+- **解决**：每次修改Map后重新赋值`conflictResolutions.value = new Map(conflictResolutions.value)`，强制触发响应式
+
+## 待Review的问题点
+
+1. **导入回滚机制**：当导入失败时回滚到备份数据，但如果回滚本身也失败（如磁盘写入错误），可能导致数据不一致。当前通过console.error记录，但用户可能无法感知。
+2. **大文件导入性能**：如果备份文件非常大（数千条），逐条addEntry可能较慢。当前方案对于典型用户场景足够。
+3. **Settings.vue复杂度**：Settings.vue现在包含导入验证弹窗、Toast、冲突弹窗等，文件变大。如果后续继续扩展，可能需要拆分。
+
+## 构建验证结果
+
+- TypeScript编译：✅ 无错误
+- Vite构建：✅ 通过
+- 现有测试：317/326 通过（9个失败为既有问题，与本次改动无关）
+
+---
+
+## 代码审查问题修复（2026-04-10）
+
+根据审查报告修复了以下问题：
+
+### 严重问题修复
+
+1. **validateBackup双重验证**
+   - 文件：`electron/main.ts#L247-L275`
+   - 问题：仅验证密码匹配备份文件，不验证密码匹配当前密码库
+   - 修复：增加`verifyPassword(currentVerifyData, password)`验证，确保备份与当前密码库主密码一致
+
+2. **importData格式验证**
+   - 文件：`electron/main.ts#L377-L384`
+   - 问题：未验证备份文件格式，可处理恶意/损坏文件
+   - 修复：添加`backupData.version`和`backupData.entries`存在性检查
+
+### 警告修复
+
+1. **importData原子性写入**
+   - 文件：`electron/main.ts#L389-L420`
+   - 问题：逐条调用`addEntry/updateEntry`，每次触发数据库写入，崩溃可导致数据不一致
+   - 修复：改为在内存中修改`database.data.entries`，单次调用`database.write()`
+
+2. **冲突处理弹窗"更改"按钮**
+   - 文件：`src/stores/vault.ts`、`src/components/ImportConflictDialog.vue`、`src/components/Settings.vue`
+   - 问题：点击"更改"按钮调用`setResolution(entryId, currentAction)`，无法清除已选择
+   - 修复：新增`removeConflictResolution`方法，"更改"按钮调用该方法清除选择
+
+3. **dialog参数类型**
+   - 文件：`electron/preload.ts`
+   - 问题：`showSaveDialog/showOpenDialog`参数类型为`any`
+   - 修复：改为`SaveDialogOptions/OpenDialogOptions`严格类型，并添加类型定义
+
+### 修复后构建验证
+
+- TypeScript编译：✅ 无错误
+- Vite构建：✅ 通过

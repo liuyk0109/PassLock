@@ -11,6 +11,7 @@ const mockElectronAPI = {
   crypto: {
     encrypt: vi.fn().mockResolvedValue('encrypted-password'),
     decrypt: vi.fn().mockResolvedValue('decrypted-password'),
+    changeMasterPassword: vi.fn().mockResolvedValue({ success: true }),
   },
   db: {
     getEntries: vi.fn().mockResolvedValue([]),
@@ -712,6 +713,7 @@ describe('剪贴板安全清除', () => {
       id: '1', title: 'Test', username: 'user', password: 'p', createdAt: 0, updatedAt: 0,
     }])
     store.copiedEntryId = '1'
+    store.setCurrentPage('settings')
 
     // 锁定
     store.lock()
@@ -721,6 +723,7 @@ describe('剪贴板安全清除', () => {
     expect(store.isLocked).toBe(true)
     expect(store.entries.length).toBe(0)
     expect(store.copiedEntryId).toBe(null)
+    expect(store.currentPage).toBe('vault')  // 锁定时重置页面状态
   })
 })
 
@@ -864,5 +867,51 @@ describe('空闲检测功能', () => {
     
     expect(store.isInitialized).toBe(true)
     expect(mockElectronAPI.db.getSettings).toHaveBeenCalled()
+  })
+})
+
+// ==================== TC-STORE-014: currentPage 状态管理 ====================
+describe('currentPage 状态管理', () => {
+  it('TC-STORE-014-01: 初始currentPage应为vault', () => {
+    const store = useVaultStore()
+    expect(store.currentPage).toBe('vault')
+  })
+
+  it('TC-STORE-014-02: setCurrentPage应更新currentPage', () => {
+    const store = useVaultStore()
+    store.setCurrentPage('settings')
+    expect(store.currentPage).toBe('settings')
+  })
+
+  it('TC-STORE-014-03: setCurrentPage可切换回vault', () => {
+    const store = useVaultStore()
+    store.setCurrentPage('settings')
+    expect(store.currentPage).toBe('settings')
+    store.setCurrentPage('vault')
+    expect(store.currentPage).toBe('vault')
+  })
+
+  it('TC-STORE-014-04: lock时应重置currentPage为vault', async () => {
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+    store.setCurrentPage('settings')
+    expect(store.currentPage).toBe('settings')
+    
+    store.lock()
+    expect(store.currentPage).toBe('vault')
+  })
+
+  it('TC-STORE-014-05: 多次切换页面状态应正确', async () => {
+    const store = useVaultStore()
+    await store.unlock('masterPassword')
+    
+    store.setCurrentPage('settings')
+    expect(store.currentPage).toBe('settings')
+    
+    store.setCurrentPage('vault')
+    expect(store.currentPage).toBe('vault')
+    
+    store.setCurrentPage('settings')
+    expect(store.currentPage).toBe('settings')
   })
 })

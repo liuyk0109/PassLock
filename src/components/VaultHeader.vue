@@ -12,6 +12,7 @@ const props = withDefaults(defineProps<Props>(), {
 interface Emits {
   (e: 'add-click'): void
   (e: 'lock-click'): void
+  (e: 'settings-click'): void
 }
 
 const emit = defineEmits<Emits>()
@@ -19,6 +20,11 @@ const emit = defineEmits<Emits>()
 // 处理新增按钮点击
 function handleAddClick() {
   emit('add-click')
+}
+
+// 处理设置按钮点击
+function handleSettingsClick() {
+  emit('settings-click')
 }
 
 // 处理锁定按钮点击
@@ -50,6 +56,13 @@ function handleLockClick() {
           <path d="M19 13H13V19H11V13H5V11H13V5H19V11H13V19H11V13H5V11H11V5H13V11H19V13Z" fill="currentColor"/>
         </svg>
         <span class="btn-text">新增</span>
+      </button>
+
+      <!-- 设置按钮 -->
+      <button class="btn-settings" @click="handleSettingsClick" title="设置">
+        <svg class="btn-icon" viewBox="0 0 24 24">
+          <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.46,5.33c-0.59,0.24-1.13,0.57-1.62,0.94L5.45,5.31c-0.22-0.08-0.47,0-0.59,0.22L2.94,8.84 c-0.12,0.21-0.08,0.47,0.12,0.61l2.03,1.58C5.05,11.33,5.03,11.64,5.03,12c0,0.32,0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z" fill="currentColor"/>
+        </svg>
       </button>
 
       <!-- 锁定按钮 -->
@@ -154,7 +167,7 @@ function handleLockClick() {
 }
 
 /* 锁定按钮 */
-.btn-lock {
+.btn-lock, .btn-settings {
   width: 40px;
   height: 40px;
   display: flex;
@@ -168,13 +181,13 @@ function handleLockClick() {
   transition: background 0.2s, border-color 0.2s;
 }
 
-.btn-lock:hover {
+.btn-lock:hover, .btn-settings:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.15);
   color: var(--text-primary);
 }
 
-.btn-lock .btn-icon {
+.btn-lock .btn-icon, .btn-settings .btn-icon {
   width: 18px;
   height: 18px;
 }

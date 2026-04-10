@@ -36,6 +36,7 @@ const mockElectronAPI = {
     generatePassword: vi.fn().mockResolvedValue('GeneratedPassword123!'),
     encrypt: vi.fn().mockResolvedValue('encrypted-data'),
     decrypt: vi.fn().mockResolvedValue('decrypted-data'),
+    changeMasterPassword: vi.fn().mockResolvedValue({ success: true }),
   },
   db: {
     getMasterKeyVerify: vi.fn().mockResolvedValue(null),
