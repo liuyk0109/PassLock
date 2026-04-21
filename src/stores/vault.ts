@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ConflictEntry, ConflictAction, ConflictCheckResult, ImportResult } from '../types/electron'
+import type { ConflictEntry, ConflictAction, ImportResult } from '../types/electron'
 
 // 密码条目类型
 export interface VaultEntry {
@@ -447,13 +447,9 @@ export const useVaultStore = defineStore('vault', () => {
     return `PassLock_Backup_${dateStr}_${timeStr}.json`
   }
 
-  // 显示Toast
+  // 显示Toast（定时器由Toast.vue组件负责管理）
   function showToast(type: 'success' | 'error', title: string, details?: string) {
     toast.value = { visible: true, type, title, details }
-    // 3秒后自动隐藏
-    setTimeout(() => {
-      toast.value.visible = false
-    }, 3000)
   }
 
   // 导出密码库数据

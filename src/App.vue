@@ -4,6 +4,7 @@ import { useVaultStore } from './stores/vault'
 import LockScreen from './components/LockScreen.vue'
 import VaultPage from './components/VaultPage.vue'
 import Settings from './components/Settings.vue'
+import Toast from './components/Toast.vue'
 
 const vaultStore = useVaultStore()
 
@@ -63,19 +64,35 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Transition name="page" mode="out-in">
-    <!-- 锁定状态：显示锁定屏幕 -->
-    <LockScreen v-if="vaultStore.isLocked" key="lock" />
-    
-    <!-- 设置页面 -->
-    <Settings v-else-if="vaultStore.currentPage === 'settings'" key="settings" />
+  <!-- 全局Toast组件 -->
+  <Toast />
+  
+  <!-- 窗口容器（圆角+阴影CSS模拟） -->
+  <div class="window-container">
+    <Transition name="page" mode="out-in">
+      <!-- 锁定状态：显示锁定屏幕 -->
+      <LockScreen v-if="vaultStore.isLocked" key="lock" />
+      
+      <!-- 设置页面 -->
+      <Settings v-else-if="vaultStore.currentPage === 'settings'" key="settings" />
 
-    <!-- 解锁状态：显示密码库页面 -->
-    <VaultPage v-else key="vault" />
-  </Transition>
+      <!-- 解锁状态：显示密码库页面 -->
+      <VaultPage v-else key="vault" />
+    </Transition>
+  </div>
 </template>
 
 <style scoped>
+/* 窗口外观CSS模拟（圆角16px + 强阴影） */
+.window-container {
+  min-height: 100vh;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
 /* 页面过渡动画 */
 .page-enter-active {
   animation: page-in 0.3s ease;

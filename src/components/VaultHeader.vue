@@ -53,7 +53,8 @@ function handleLockClick() {
       <!-- 新增按钮 -->
       <button class="btn-add" @click="handleAddClick">
         <svg class="btn-icon" viewBox="0 0 24 24">
-          <path d="M19 13H13V19H11V13H5V11H13V5H19V11H13V19H11V13H5V11H11V5H13V11H19V13Z" fill="currentColor"/>
+          <!-- 简洁单笔画加号 -->
+          <path d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6v-2z" fill="currentColor"/>
         </svg>
         <span class="btn-text">新增</span>
       </button>

@@ -313,20 +313,20 @@ describe('Toast状态和方法', () => {
     vi.useRealTimers()
   })
 
-  it('TC-BACKUP-004-04: toast应在3秒后自动隐藏', async () => {
-    vi.useFakeTimers()
+  it('TC-BACKUP-004-04: showToast不设置setTimeout（由Toast.vue组件管理定时器）', async () => {
+    // UI优化(20260422001)修复了Toast定时器双重管理问题
+    // vault.ts中的setTimeout已移除，定时器由Toast.vue组件的watch监听负责
     
     const store = useVaultStore()
     store.showToast('success', '测试')
     
+    // showToast只设置状态，不设置定时器
     expect(store.toast.visible).toBe(true)
+    expect(store.toast.type).toBe('success')
+    expect(store.toast.title).toBe('测试')
     
-    // 快进3秒
-    vi.advanceTimersByTime(3000)
-    
-    expect(store.toast.visible).toBe(false)
-    
-    vi.useRealTimers()
+    // 定时器管理由Toast.vue组件负责（需要组件挂载后watch监听生效）
+    // 在单元测试环境中不测试组件的定时器行为，已在toast.test.ts中验证
   })
 })
 

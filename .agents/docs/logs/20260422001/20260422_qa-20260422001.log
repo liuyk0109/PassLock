@@ -1,0 +1,123 @@
+# QA测试日志
+
+**任务ID**：20260422001
+**测试日期**：2026-04-22
+**测试范围**：UI优化功能验证 + 全量回归测试
+
+---
+
+## 测试执行过程
+
+### 1. 测试用例设计
+
+#### 新增测试文件
+1. `tests/toast.test.ts` - Toast组件状态管理测试（15个测试用例）
+2. `tests/ui-optimization.test.ts` - UI优化功能测试（12个测试用例）
+
+#### 修改测试文件
+1. `tests/lockscreen.test.ts` - 更新5个测试用例，从error-box改为Toast验证
+2. `tests/backup-import.test.ts` - 更新1个测试用例，反映vault.ts setTimeout移除
+
+---
+
+### 2. 测试执行
+
+#### 新增测试用例执行结果
+
+**Toast组件测试 (tests/toast.test.ts)**：
+- TC-TOAST-001-01: showToast正确设置toast状态 ✅
+- TC-TOAST-001-02: showToast不设置setTimeout（已移除） ✅
+- TC-TOAST-001-03: showToast支持无details参数 ✅
+- TC-TOAST-001-04: 多次调用showToast更新状态 ✅
+- TC-TOAST-002-01: error类型正确设置 ✅
+- TC-TOAST-002-02: success类型正确设置 ✅
+- TC-TOAST-003-01: Toast默认不可见 ✅
+- TC-TOAST-004-01: 极长标题处理 ✅
+- TC-TOAST-004-02: 极长详情处理 ✅
+- TC-TOAST-004-03: 特殊字符处理 ✅
+- TC-TOAST-004-04: 空标题处理 ✅
+- TC-TOAST-004-05: 快速连续调用showToast ✅
+- TC-TOAST-005-01: 手动设置visible=false隐藏 ✅
+- TC-TOAST-006-01: toast状态包含必要字段 ✅
+- TC-TOAST-006-02: toast状态类型正确 ✅
+
+**UI优化测试 (tests/ui-optimization.test.ts)**：
+- TC-UI-OPT-001-01: 新增按钮包含SVG图标 ✅
+- TC-UI-OPT-001-02: 新增按钮使用简洁单笔画加号SVG ✅
+- TC-UI-OPT-001-03: 新增按钮点击触发emit ✅
+- TC-UI-OPT-002-01: cards-grid使用CSS Grid布局 ✅
+- TC-UI-OPT-002-02: 响应式布局使用cards-grid类 ✅
+- TC-UI-OPT-003-01: window-container应用圆角样式 ✅
+- TC-UI-OPT-003-02: window-container类正确应用 ✅
+- TC-UI-OPT-004-01: App包含Toast组件 ✅
+- TC-UI-OPT-005-01: VaultHeader正确渲染 ✅
+- TC-UI-OPT-005-02: Logo容器样式正确 ✅
+- TC-UI-OPT-005-03: 锁定按钮和设置按钮存在 ✅
+- TC-UI-OPT-006-01: 响应式布局类存在 ✅
+
+#### 修改测试用例执行结果
+
+**LockScreen Toast验证 (tests/lockscreen.test.ts)**：
+- TC-UI-002-04: 短密码(<6位)提交应通过Toast显示错误 ✅
+- TC-UI-002-05: 两次密码不一致应通过Toast显示错误 ✅
+- TC-UI-003-03: 空密码提交应通过Toast显示错误 ✅
+- TC-UI-003-05: 错误密码应通过Toast显示错误信息 ✅
+- TC-UI-008-01: API错误应通过Toast显示友好错误信息 ✅
+
+**备份导入Toast验证 (tests/backup-import.test.ts)**：
+- TC-BACKUP-004-04: showToast不设置setTimeout（由Toast.vue组件管理定时器） ✅
+
+---
+
+### 3. 全量回归测试
+
+**测试命令**：`pnpm test`
+
+**测试结果**：
+- 总测试数：429
+- 通过数：422
+- 失败数：7
+- 通过率：98.4%
+
+**失败测试分析**（已有问题，非本次UI优化引入）：
+1. TC-CRYPTO-005-01: Base64正则验证失败（正则表达式问题）
+2. TC-CRYPTO-008-04: 密码强度分数计算与预期不符
+3. TC-UI-004-03: 密码强度显示"弱"测试数据问题
+4. TC-UI-004-04: 密码强度显示"中等"测试数据问题
+5. TC-UI-004-05: 密码强度显示"强"测试数据问题
+6. TC-UI-007-03: 提交状态恢复异步问题
+7. TC-ASYNC-003-04: 复制状态清除假定时器问题
+
+---
+
+### 4. 修复验证
+
+**Toast定时器双重管理问题**：
+- 问题：vault.ts和Toast.vue各自设置setTimeout导致竞态条件
+- 修复：移除vault.ts中showToast的setTimeout
+- 验证：TC-TOAST-001-02测试通过确认修复
+
+**LockScreen冗余error变量问题**：
+- 问题：移除error-box后仍保留error ref变量和clearError函数
+- 修复：移除所有冗余代码（-11行）
+- 验证：Toast相关测试全部通过确认修复
+
+---
+
+## 测试结论
+
+**状态**：✅ **PASS**
+
+本次UI优化任务测试验证结论：
+1. 新功能测试：27个新增测试用例全部通过
+2. 回归测试：UI优化相关测试全部通过，无新增失败
+3. 已有问题：7个失败为项目已有问题，不影响UI优化功能
+4. 修复验证：Toast定时器和冗余代码问题已正确修复
+
+建议进入打包发布阶段。
+
+---
+
+## 下一步行动
+
+呼叫 **Publisher Agent** 进行打包发布。

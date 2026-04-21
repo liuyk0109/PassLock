@@ -9,7 +9,6 @@ const isFirstTime = ref(true)
 const loading = ref(true)
 const password = ref('')
 const confirmPassword = ref('')
-const error = ref('')
 const submitting = ref(false)
 
 // 密码可见性
@@ -55,11 +54,9 @@ onMounted(async () => {
   try {
     const verifyData = await window.electronAPI.db.getMasterKeyVerify()
     isFirstTime.value = !verifyData
-    error.value = ''
   } catch (e) {
     console.error('LockScreen init error:', e)
     isFirstTime.value = true
-    error.value = ''
   } finally {
     loading.value = false
   }
@@ -76,15 +73,13 @@ function togglePasswordVisibility(field: 'password' | 'confirm') {
 
 // 初始化主密码
 async function handleInit() {
-  error.value = ''
-
   if (password.value.length < 6) {
-    error.value = '密码长度至少 6 位'
+    vaultStore.showToast('error', '密码长度至少 6 位')
     return
   }
 
   if (password.value !== confirmPassword.value) {
-    error.value = '两次密码不一致'
+    vaultStore.showToast('error', '两次密码不一致')
     return
   }
 
@@ -95,7 +90,7 @@ async function handleInit() {
     await window.electronAPI.db.setMasterKeyVerify(verifyData)
     await vaultStore.unlock(password.value)
   } catch (e) {
-    error.value = '初始化失败，请重试'
+    vaultStore.showToast('error', '初始化失败，请重试')
     console.error(e)
   } finally {
     submitting.value = false
@@ -104,10 +99,8 @@ async function handleInit() {
 
 // 解锁密码库
 async function handleUnlock() {
-  error.value = ''
-
   if (password.value.length === 0) {
-    error.value = '请输入主密码'
+    vaultStore.showToast('error', '请输入主密码')
     return
   }
 
@@ -116,7 +109,7 @@ async function handleUnlock() {
   try {
     const verifyData = await window.electronAPI.db.getMasterKeyVerify()
     if (!verifyData) {
-      error.value = '数据异常，请重新初始化'
+      vaultStore.showToast('error', '数据异常，请重新初始化')
       isFirstTime.value = true
       return
     }
@@ -125,19 +118,14 @@ async function handleUnlock() {
     if (valid) {
       await vaultStore.unlock(password.value)
     } else {
-      error.value = '密码错误'
+      vaultStore.showToast('error', '密码错误')
     }
   } catch (e) {
-    error.value = '解锁失败，请重试'
+    vaultStore.showToast('error', '解锁失败，请重试')
     console.error(e)
   } finally {
     submitting.value = false
   }
-}
-
-// 清除错误
-function clearError() {
-  error.value = ''
 }
 </script>
 
@@ -185,7 +173,6 @@ function clearError() {
             placeholder="主密码"
             class="input"
             :disabled="submitting"
-            @input="clearError"
           />
           <button
             type="button"
@@ -225,7 +212,6 @@ function clearError() {
             placeholder="确认密码"
             class="input"
             :disabled="submitting"
-            @input="clearError"
           />
           <button
             type="button"
@@ -255,14 +241,6 @@ function clearError() {
           </svg>
           {{ submitting ? '创建中...' : '创建密码库' }}
         </button>
-
-        <!-- 错误提示框 -->
-        <div v-if="error" class="error-box">
-          <svg class="error-icon" viewBox="0 0 24 24">
-            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z" fill="currentColor"/>
-          </svg>
-          <span>{{ error }}</span>
-        </div>
       </form>
 
       <!-- 解锁密码库 -->
@@ -282,7 +260,6 @@ function clearError() {
             placeholder="主密码"
             class="input"
             :disabled="submitting"
-            @input="clearError"
           />
           <button
             type="button"
@@ -306,14 +283,6 @@ function clearError() {
           </svg>
           {{ submitting ? '解锁中...' : '解锁' }}
         </button>
-
-        <!-- 错误提示框 -->
-        <div v-if="error" class="error-box">
-          <svg class="error-icon" viewBox="0 0 24 24">
-            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z" fill="currentColor"/>
-          </svg>
-          <span>{{ error }}</span>
-        </div>
       </form>
 
       <!-- 底部安全提示 -->
@@ -632,29 +601,6 @@ function clearError() {
   width: 16px;
   height: 16px;
   animation: spin 1s linear infinite;
-}
-
-/* 错误提示框 */
-.error-box {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  background: var(--error-bg);
-  border: 1px solid var(--error-border);
-  border-radius: 10px;
-  padding: var(--space-md) var(--space-lg);
-  margin-top: var(--space-lg);
-}
-
-.error-icon {
-  width: 18px;
-  height: 18px;
-  color: var(--error);
-}
-
-.error-box span {
-  font-size: 13px;
-  color: var(--error);
 }
 
 /* 底部 */

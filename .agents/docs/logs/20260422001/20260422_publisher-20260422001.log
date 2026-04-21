@@ -1,0 +1,99 @@
+# Publisher Agent 日志
+
+**任务ID**: 20260422001
+**日期**: 2026-04-22
+**Agent**: Publisher
+
+---
+
+## 任务描述
+
+执行PassLock v0.1.0-beta版本打包发布。
+
+---
+
+## 执行步骤
+
+### 1. 读取配置文件
+
+- `package.json`: 版本号从 0.0.1-alpha.01 更新为 0.1.0-beta
+- `vite.config.ts`: 构建配置正常
+- 测试报告: QA测试已通过 (422/429, 98.4%)
+
+### 2. 版本号更新
+
+- 更新 `package.json` 中 `version` 字段: `0.0.1-alpha.01` → `0.1.0-beta`
+
+### 3. TypeScript错误修复
+
+构建过程中发现3个未使用变量错误，已修复：
+
+1. `ImportConflictDialog.vue`: 移除未使用的 `computed` 导入
+2. `Settings.vue`: 移除未使用的 `formatDate` 函数
+3. `vault.ts`: 移除未使用的 `ConflictCheckResult` 类型导入
+
+### 4. 构建执行
+
+```bash
+pnpm build
+```
+
+构建产物：
+- `dist/index.html`: 0.46 kB
+- `dist/assets/index-Boom0Lif.css`: 50.36 kB
+- `dist/assets/index-UQ37mzJ8.js`: 147.98 kB
+- `dist-electron/main.js`: 13.63 kB
+- `dist-electron/preload.js`: 2.36 kB + 1.57 kB
+
+### 5. 打包执行
+
+```bash
+pnpm dist
+```
+
+打包产物：
+- `release/PassLock Setup 0.1.0-beta.exe`: ~99.9 MB
+- `release/PassLock Setup 0.1.0-beta.exe.blockmap`: ~106 KB
+- `release/win-unpacked/`: 未打包版本目录
+
+### 6. 发布说明
+
+创建发布说明文档：`.agents/docs/release-notes/RELEASE-0.1.0-beta.md`
+
+---
+
+## 打包配置详情
+
+- **appId**: com.passlock.app
+- **productName**: PassLock
+- **target**: Windows NSIS (x64)
+- **nsis配置**:
+  - oneClick: false
+  - allowToChangeInstallationDirectory: true
+  - createDesktopShortcut: true
+  - createStartMenuShortcut: true
+
+---
+
+## 产出清单
+
+| 文件 | 大小 | 说明 |
+|-----|------|------|
+| PassLock Setup 0.1.0-beta.exe | ~99.9 MB | Windows安装包 |
+| PassLock Setup 0.1.0-beta.exe.blockmap | ~106 KB | 增量更新文件 |
+| builder-effective-config.yaml | 455 B | 构建配置 |
+| builder-debug.yml | 7.6 KB | 构建调试信息 |
+| latest.yml | 359 B | 版本元数据 |
+
+---
+
+## 发布渠道
+
+- 本地发布（release目录）
+- 待上传至GitHub Releases（如需要）
+
+---
+
+## 状态
+
+✅ 打包发布完成

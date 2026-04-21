@@ -398,10 +398,10 @@ onUnmounted(() => {
   color: var(--text-muted);
 }
 
-/* 卡片网格 */
+/* 卡片网格 - CSS Grid auto-fill 流畅自适应 */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(var(--card-columns, 4), 260px);
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 24px 20px;
   justify-content: center;
 }
@@ -450,38 +450,14 @@ onUnmounted(() => {
   }
 }
 
-/* 响应式适配 - 使用 1199px 作为边界，确保 1200px 及以上保持4列 */
-@media (max-width: 1199px) {
-  .cards-grid {
-    --card-columns: 3;
-  }
-}
-
-@media (max-width: 1023px) {
-  .cards-grid {
-    --card-columns: 2;
-    gap: 20px 16px;
-  }
-
-  .cards-container {
-    padding: var(--space-xl);
-  }
-}
-
+/* 响应式适配 - 优化间距 */
 @media (max-width: 639px) {
-  .cards-grid {
-    --card-columns: 1;
-    gap: 16px;
-  }
-
   .cards-container {
     padding: var(--space-lg);
   }
 
-  .cards-grid > * {
-    width: 100%;
-    max-width: 320px;
-    margin: 0 auto;
+  .cards-grid {
+    gap: 16px;
   }
 }
 </style>

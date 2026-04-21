@@ -54,6 +54,9 @@ function createWindow() {
     },
   })
 
+  // 移除默认菜单栏（UI优化：现代化外观）
+  win.setMenu(null)
+
   // 开发模式下加载 Vite 开发服务器
   if (process.env.NODE_ENV === 'development') {
     win.loadURL('http://localhost:5173')

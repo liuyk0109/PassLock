@@ -98,12 +98,6 @@ function handleImportKeydown(e: KeyboardEvent) {
   }
 }
 
-// 格式化时间戳
-function formatDate(timestamp: number): string {
-  const date = new Date(timestamp)
-  return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
-}
-
 // 导出中状态
 const isExporting = computed(() => vaultStore.exportStatus === 'exporting')
 

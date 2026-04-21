@@ -10,13 +10,13 @@ import { useVaultStore } from '../src/stores/vault'
 
 // 由于Vue Test Utils对script setup组件的类型推断限制
 // 使用辅助函数获取组件状态
+// 注意：error变量已在UI优化任务中移除，改为使用Toast显示错误
 function getVM(wrapper: ReturnType<typeof mount>) {
   return wrapper.vm as {
     isFirstTime: boolean
     loading: boolean
     password: string
     confirmPassword: string
-    error: string
     submitting: boolean
     showPassword: boolean
     showConfirmPassword: boolean
@@ -165,13 +165,15 @@ describe('首次使用流程', () => {
     expect(wrapper.find('.strength-bar').exists()).toBe(true)
   })
 
-  it('TC-UI-002-04: 短密码(<6位)提交应显示错误', async () => {
+  it('TC-UI-002-04: 短密码(<6位)提交应通过Toast显示错误', async () => {
     const wrapper = mount(LockScreen, {
       global: { plugins: [createPinia()] },
     })
     
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 100))
+    
+    const store = useVaultStore()
     
     // 输入短密码
     getVM(wrapper).password = 'abc'
@@ -180,11 +182,13 @@ describe('首次使用流程', () => {
     // 触发提交
     await wrapper.find('form').trigger('submit.prevent')
     
-    expect(getVM(wrapper).error).toBe('密码长度至少 6 位')
-    expect(wrapper.find('.error-box').exists()).toBe(true)
+    // 验证Toast被调用（替代原来的error-box验证）
+    expect(store.toast.visible).toBe(true)
+    expect(store.toast.type).toBe('error')
+    expect(store.toast.title).toBe('密码长度至少 6 位')
   })
 
-  it('TC-UI-002-05: 两次密码不一致应显示错误', async () => {
+  it('TC-UI-002-05: 两次密码不一致应通过Toast显示错误', async () => {
     const wrapper = mount(LockScreen, {
       global: { plugins: [createPinia()] },
     })
@@ -192,12 +196,17 @@ describe('首次使用流程', () => {
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 100))
     
+    const store = useVaultStore()
+    
     getVM(wrapper).password = 'password1'
     getVM(wrapper).confirmPassword = 'password2'
     
     await wrapper.find('form').trigger('submit.prevent')
     
-    expect(getVM(wrapper).error).toBe('两次密码不一致')
+    // 验证Toast被调用
+    expect(store.toast.visible).toBe(true)
+    expect(store.toast.type).toBe('error')
+    expect(store.toast.title).toBe('两次密码不一致')
   })
 
   it('TC-UI-002-06: 正确输入应成功创建密码库', async () => {
@@ -260,7 +269,7 @@ describe('解锁流程', () => {
     expect(inputs.length).toBe(1)
   })
 
-  it('TC-UI-003-03: 空密码提交应显示错误', async () => {
+  it('TC-UI-003-03: 空密码提交应通过Toast显示错误', async () => {
     const wrapper = mount(LockScreen, {
       global: { plugins: [createPinia()] },
     })
@@ -268,11 +277,16 @@ describe('解锁流程', () => {
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 100))
     
+    const store = useVaultStore()
+    
     getVM(wrapper).password = ''
     
     await wrapper.find('form').trigger('submit.prevent')
     
-    expect(getVM(wrapper).error).toBe('请输入主密码')
+    // 验证Toast被调用
+    expect(store.toast.visible).toBe(true)
+    expect(store.toast.type).toBe('error')
+    expect(store.toast.title).toBe('请输入主密码')
   })
 
   it('TC-UI-003-04: 正确密码应成功解锁', async () => {
@@ -295,7 +309,7 @@ describe('解锁流程', () => {
     expect(store.isUnlocked).toBe(true)
   })
 
-  it('TC-UI-003-05: 错误密码应显示错误信息', async () => {
+  it('TC-UI-003-05: 错误密码应通过Toast显示错误信息', async () => {
     mockElectronAPI.crypto.verifyPassword.mockResolvedValue(false)
     
     const wrapper = mount(LockScreen, {
@@ -305,12 +319,17 @@ describe('解锁流程', () => {
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 100))
     
+    const store = useVaultStore()
+    
     getVM(wrapper).password = 'wrongPassword'
     
     await wrapper.find('form').trigger('submit.prevent')
     await new Promise(resolve => setTimeout(resolve, 100))
     
-    expect(getVM(wrapper).error).toBe('密码错误')
+    // 验证Toast被调用
+    expect(store.toast.visible).toBe(true)
+    expect(store.toast.type).toBe('error')
+    expect(store.toast.title).toBe('密码错误')
   })
 
   it('TC-UI-003-06: 解锁按钮文本正确', async () => {
@@ -605,12 +624,12 @@ describe('提交状态处理', () => {
 })
 
 // ==================== TC-UI-008: 错误处理 ====================
-describe('错误处理', () => {
+describe('错误处理（Toast替代error-box）', () => {
   beforeEach(() => {
     mockElectronAPI.db.getMasterKeyVerify.mockResolvedValue(null)
   })
 
-  it('TC-UI-008-01: API错误应显示友好错误信息', async () => {
+  it('TC-UI-008-01: API错误应通过Toast显示友好错误信息', async () => {
     mockElectronAPI.crypto.createVerifyData.mockRejectedValue(new Error('Network error'))
     
     const wrapper = mount(LockScreen, {
@@ -620,48 +639,23 @@ describe('错误处理', () => {
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 100))
     
+    const store = useVaultStore()
+    
     getVM(wrapper).password = 'validPassword'
     getVM(wrapper).confirmPassword = 'validPassword'
     
     await wrapper.find('form').trigger('submit.prevent')
     await new Promise(resolve => setTimeout(resolve, 100))
     
-    expect(getVM(wrapper).error).toBe('初始化失败，请重试')
-    expect(wrapper.find('.error-box').exists()).toBe(true)
+    // 验证Toast被调用（替代原来的error-box验证）
+    expect(store.toast.visible).toBe(true)
+    expect(store.toast.type).toBe('error')
+    expect(store.toast.title).toBe('初始化失败，请重试')
   })
 
-  it('TC-UI-008-02: 输入时清除错误信息', async () => {
-    const wrapper = mount(LockScreen, {
-      global: { plugins: [createPinia()] },
-    })
-    
-    await wrapper.vm.$nextTick()
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // 设置错误
-    getVM(wrapper).error = 'Previous error'
-    
-    // 输入触发清除
-    const passwordInput = wrapper.findAll('.input')[0]
-    await passwordInput.setValue('new input')
-    
-    expect(getVM(wrapper).error).toBe('')
-  })
-
-  it('TC-UI-008-03: 错误框显示正确的样式', async () => {
-    const wrapper = mount(LockScreen, {
-      global: { plugins: [createPinia()] },
-    })
-    
-    await wrapper.vm.$nextTick()
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    getVM(wrapper).error = 'Test error'
-    await wrapper.vm.$nextTick()
-    
-    expect(wrapper.find('.error-box').exists()).toBe(true)
-    expect(wrapper.find('.error-icon').exists()).toBe(true)
-  })
+  // TC-UI-008-02和TC-UI-008-03已移除
+  // error变量和clearError函数已在UI优化任务(20260422001)中移除
+  // 错误信息现在通过Toast组件显示，不再有error-box
 })
 
 // ==================== TC-UI-009: 边界测试 ====================
@@ -683,8 +677,8 @@ describe('边界测试', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await new Promise(resolve => setTimeout(resolve, 100))
     
-    // 应正常处理
-    expect(getVM(wrapper).error).toBe('')
+    // 应正常处理（不再验证error变量，因为已移除）
+    expect(mockElectronAPI.crypto.createVerifyData).toHaveBeenCalled()
   })
 
   it('TC-UI-009-02: 特殊字符密码', async () => {
